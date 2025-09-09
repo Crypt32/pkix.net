@@ -117,13 +117,22 @@ public enum CertSrvCrlFlags {
     /// <summary>
     /// Configures partition zero (at index [0]) to be exclusively a partition, rather than a complete (aggregate) CRL.
     /// </summary>
+    /// <remarks>
+    ///     Available in Windows Server 2019 and later versions of the Windows OS after installing the 2025 September (9B) Windows update.
+    /// </remarks>
     PartitionZeroExclusive          = 0x00800000,    // 8388608
     /// <summary>
     /// TODO: Complete the description.
     /// </summary>
+    /// <remarks>
+    ///     Available in Windows Server 2019 and later versions of the Windows OS after installing the 2025 September (9B) Windows update.
+    /// </remarks>
     ContainsOnlyCaCerts             = 0x01000000,    // 16777216
     /// <summary>
     /// TODO: Complete the description.
     /// </summary>
+    /// <remarks>
+    ///     Available in Windows Server 2019 and later versions of the Windows OS after installing the 2025 September (9B) Windows update.
+    /// </remarks>
     ContainsOnlyUserCerts           = 0x02000000,    // 33554432
 }
