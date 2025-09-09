@@ -37,44 +37,44 @@ namespace PKI.CertificateServices.Flags;
         /// When a CA server is configured to use the unmodified subject that is supplied in the certificate request, the policy module should not make any
         /// changes to the subject that is in the certificate request.
         /// </summary>
-        RebuildModifiedSubjectOnly        = 0x00000020,    // 32
+        RebuildModifiedSubjectOnly      = 0x00000020,    // 32
         /// <summary>
         /// N/A
         /// </summary>
-        SaveFailedCerts                    = 0x00000040,    // 64
+        SaveFailedCerts                 = 0x00000040,    // 64
         /// <summary>
         /// The CA server ignores unknown CMC attributes in the request.
         /// </summary>
-        IgnoreUnknownCMCAttributes        = 0x00000080,    // 128
+        IgnoreUnknownCMCAttributes      = 0x00000080,    // 128
         /// <summary>
         /// The CA server ignores trust errors for cross-certificates during certificate chain building.
         /// </summary>
-        IgnoreCrossCertTrustError        = 0x00000100,    // 256
+        IgnoreCrossCertTrustError       = 0x00000100,    // 256
         /// <summary>
         /// The CA will publish expired revoked certificates in CRLs.
         /// </summary>
-        PublishExpiredCertCRLs            = 0x00000200,    // 512
+        PublishExpiredCertCRLs          = 0x00000200,    // 512
         /// <summary>
         /// The CA enforces enrollment agent restrictions.
         /// </summary>
-        EnforceEnrollmentAgent            = 0x00000400,    // 1024
+        EnforceEnrollmentAgent          = 0x00000400,    // 1024
         /// <summary>
         /// The CA server will not re-order relative distinguished name (RDN) in the certificate request.
         /// </summary>
-        DisableRDNReorder                = 0x00000800,    // 2048
+        DisableRDNReorder               = 0x00000800,    // 2048
         /// <summary>
         /// Instructs Root CA server to not generate root cross-certificates after Root CA renewal with new key pair.
         /// <p><strong>Note:</strong> this flag has no effect on any type of Subordinate CA.</p>
         /// </summary>
-        DisableRootCrossCerts            = 0x00001000,    // 4096
+        DisableRootCrossCerts           = 0x00001000,    // 4096
         /// <summary>
         ///  The CA will dump request response to console.
         /// </summary>
-        LogfullResponse                    = 0x00002000,    // 8192
+        LogfullResponse                 = 0x00002000,    // 8192
         /// <summary>
         /// Instructs CA server to use CA Exchange template instead of using automatically generated short-lived certificates for key archival.
         /// </summary>
-        UseXCHGCertTemplate                = 0x00004000,    // 16384
+        UseXCHGCertTemplate             = 0x00004000,    // 16384
         /// <summary>
         /// Instructs Root CA server to use Cross Certification Authority template during Root CA renewal with new key pair, instead of using
         /// automatically generated cross-certificates.
@@ -96,7 +96,7 @@ namespace PKI.CertificateServices.Flags;
         /// <summary>
         ///  The CA server will preserve CA certificates in database and certificate store even if the certificates are revoked.
         /// </summary>
-        PreserveRevokedCACerts            = 0x00080000,    // 524288
+        PreserveRevokedCACerts          = 0x00080000,    // 524288
         /// <summary>
         /// The CA server will preserve revoked CA certificates in database and certificate store.
         /// <para><strong>Windows Server 2003, Windows Server 2008</strong>: this flag is not supported.</para>
@@ -106,5 +106,24 @@ namespace PKI.CertificateServices.Flags;
         /// N/A
         /// <para><strong>Windows Server 2003, Windows Server 2008</strong>: this flag is not supported.</para>
         /// </summary>
-        BuildRootCACRLEntriesBasedOnKey = 0x00200000    // 2097152
+        BuildRootCACRLEntriesBasedOnKey = 0x00200000,    // 2097152
+        /// <summary>
+        /// Instructs the CA to enable partitioned CRLs.
+        /// </summary>
+        /// <remarks>
+        ///     Available in Windows Server 2019 and later versions of the Windows OS after installing the 2025 September (9B) Windows update.
+        /// </remarks>
+        EnableCrlPartition              = 0x00400000,    // 4194304
+        /// <summary>
+        /// Configures partition zero (at index [0]) to be exclusively a partition, rather than a complete (aggregate) CRL.
+        /// </summary>
+        PartitionZeroExclusive          = 0x00800000,    // 8388608
+        /// <summary>
+        /// TODO: Complete the description.
+        /// </summary>
+        ContainsOnlyCaCerts             = 0x01000000,    // 16777216
+        /// <summary>
+        /// TODO: Complete the description.
+        /// </summary>
+        ContainsOnlyUserCerts           = 0x02000000,    // 33554432
     }
