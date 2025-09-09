@@ -47,6 +47,7 @@ class CertAdmConstants {
     public const Int32 CrPropCertaiaurls                      = 0x0000002A; // Authority Information Access
     public const Int32 CrPropCertaiaocsprls                   = 0x0000002B; // OCSP URLs
     public const Int32 CrPropLocalename                       = 0x0000002C; // CA Locale Name
+    public const Int32 CrPropSubjectTemplateOids              = 0x0000002D; // Subject Template
     public const Int32 CrPropCrlPartitionCount                = 0x0000002E; // CRL Partitions Count
     public const Int32 CrPropPartitionedBaseCrl               = 0x0000002F; // Partitioned Base CRL
     public const Int32 CrPropPartitionedDeltaCrl              = 0x00000030; // Partitioned Delta CRL
