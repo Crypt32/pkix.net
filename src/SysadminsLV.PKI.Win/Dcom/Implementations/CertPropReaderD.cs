@@ -30,7 +30,10 @@ public class CertPropReaderD : ICertPropReaderD {
         }
     }
     Int32 getIntegerProperty(AdcsCAPropertyName propID, Int32 index = 0) {
-        return (Int32)_getCaPropertyFunc.Invoke(_configString, (Int32)propID, index, (Int32)AdcsCAPropertyValueType.Long, 0);
+        return getIntegerProperty<Int32>(propID, index);
+    }
+    T getIntegerProperty<T>(AdcsCAPropertyName propID, Int32 index = 0) where T: struct {
+        return (T)_getCaPropertyFunc.Invoke(_configString, (Int32)propID, index, (Int32)AdcsCAPropertyValueType.Long, 0);
     }
     Byte[] getBinaryProperty(AdcsCAPropertyName propID, Int32 index = 0) {
         String value = (String)_getCaPropertyFunc.Invoke(_configString, (Int32)propID, index, (Int32)AdcsCAPropertyValueType.Binary, (Int32)AdcsBinaryFormat.Base64NoHeader);
@@ -278,5 +281,30 @@ public class CertPropReaderD : ICertPropReaderD {
             .ToList().ForEach(x => retValue.Add(new Oid(x)));
         return retValue;
     }
+    /// <inheritdoc />
+    public Int32 GetPartitionCount() {
+        return getIntegerProperty(AdcsCAPropertyName.CrlPartitionCount);
+    }
+    /// <inheritdoc />
+    public Byte[] GetPartitionedBaseCrl(Int32 caKeyIndex, Int32 partitionIndex) {
+        return getBinaryProperty(AdcsCAPropertyName.PartitionedBaseCrl, getPartitionPropIndex(caKeyIndex, partitionIndex));
+    }
+    /// <inheritdoc />
+    public Byte[] GetPartitionedDeltaCrl(Int32 caKeyIndex, Int32 partitionIndex) {
+        return getBinaryProperty(AdcsCAPropertyName.PartitionedDeltaCrl, getPartitionPropIndex(caKeyIndex, partitionIndex));
+    }
+    /// <inheritdoc />
+    public AdcsPropCrlPublishState GetPartitionedBaseCrlPublishStatus(Int32 caKeyIndex, Int32 partitionIndex) {
+        return getIntegerProperty<AdcsPropCrlPublishState>(AdcsCAPropertyName.PartitionedBaseCrlPublishStatus, getPartitionPropIndex(caKeyIndex, partitionIndex));
+    }
+    /// <inheritdoc />
+    public AdcsPropCrlPublishState GetPartitionedDeltaCrlPublishStatus(Int32 caKeyIndex, Int32 partitionIndex) {
+        return (AdcsPropCrlPublishState)getIntegerProperty(AdcsCAPropertyName.PartitionedDeltaCrlPublishStatus, getPartitionPropIndex(caKeyIndex, partitionIndex));
+    }
+
+    static Int32 getPartitionPropIndex(Int32 keyIndex, Int32 partitionIndex) {
+        return (partitionIndex << 16) | keyIndex;
+    }
+
     #endregion
 }
