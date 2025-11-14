@@ -48,6 +48,17 @@ public enum CspAlgorithmOperation {
     /// </summary>
     RandomNumberGeneration = 0x00000020, // 32,
     /// <summary>
+    /// Represents the key derivation flag used to indicate that the cryptographic operation involves key derivation.
+    /// </summary>
+    KeyDerivation          = 0x00000040, // 64,
+    /// <summary>
+    /// Represents the key encapsulation flag used in cryptographic operations.
+    /// </summary>
+    /// <remarks>This flag is typically used to indicate that a key encapsulation mechanism (KEM) is being
+    /// applied. Key encapsulation is a cryptographic technique used to securely transmit a symmetric key using
+    /// asymmetric encryption.</remarks>
+    KeyEncapsulation       = 0x00000080, // 128,
+    /// <summary>
     /// Signature algorithms are preferred but not required. An encryption algorithm may be chosen instead.
     /// This is used when searching for cryptographic service provider (CSP) status information based on
     /// supported operational capability.

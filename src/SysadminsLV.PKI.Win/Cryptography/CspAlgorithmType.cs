@@ -35,4 +35,17 @@ public enum CspAlgorithmType {
     /// The algorithm is used to generate a random number.
     /// </summary>
     RandomNumberGenerator = 6,
+    /// <summary>
+    /// Represents the key derivation operation in cryptographic processes.
+    /// </summary>
+    /// <remarks>This value is typically used to specify that a cryptographic operation involves deriving a
+    /// key  from a given input, such as a password or other secret material, using a key derivation function
+    /// (KDF).</remarks>
+    KeyDerivation         = 7,
+    /// <summary>
+    /// Represents the key encapsulation mechanism used in cryptographic operations.
+    /// </summary>
+    /// <remarks>Key encapsulation is a cryptographic technique used to securely exchange keys between
+    /// parties. This ML-KEM algorithm.</remarks>
+    KeyEncapsulation      = 8
 }
