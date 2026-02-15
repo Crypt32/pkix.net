@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
@@ -107,7 +108,7 @@ public interface IAdcsCertificateTemplate {
     /// <summary>
     /// Gets optional private key security descriptor in SDDL format.
     /// </summary>
-    String CryptPrivateKeySDDL { get; }
+    String? CryptPrivateKeySDDL { get; }
     /// <summary>
     /// Gets a collection of superseded template common names.
     /// </summary>

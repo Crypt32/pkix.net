@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
@@ -163,11 +164,11 @@ static class DsUtils {
     /// <param name="propName">Search RDN attribute name or its OID.</param>
     /// <param name="propValue">Search value.</param>
     /// <returns>Fully escaped LDAP path with "LDAP://" prefix if the object is found, otherwise NULL.</returns>
-    public static String Find(String searchRoot, String propName, String propValue) {
+    public static String? Find(String searchRoot, String propName, String propValue) {
         using var entry = new DirectoryEntry($"LDAP://{searchRoot}");
         using var searcher = new DirectorySearcher(entry);
         searcher.Filter = $"{propName}={propValue}";
-        using DirectoryEntry resultEntry = searcher.FindOne()?.GetDirectoryEntry();
+        using DirectoryEntry? resultEntry = searcher.FindOne()?.GetDirectoryEntry();
 
         return resultEntry?.Path;
     }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Linq;
@@ -23,11 +24,11 @@ public sealed class CertTemplateSecurityDescriptor : CommonObjectSecurity {
         DisplayName = template.DisplayName;
         _schemaVersion = template.SchemaVersion;
         if (String.IsNullOrEmpty(template.DistinguishedName)) {
-            String ldapPath = DsCertificateTemplate.GetLdapPath(template.Name);
+            String? ldapPath = DsCertificateTemplate.GetLdapPath(template.Name);
             if (String.IsNullOrEmpty(ldapPath)) {
                 throw new ArgumentException($"Requested certificate template '{template.Name}' was not found in Active Directory or connection failed.");
             }
-            _x500Path = ldapPath;
+            _x500Path = ldapPath!;
         } else {
             _x500Path = "LDAP://" + template.DistinguishedName;
         }
@@ -120,10 +121,10 @@ public sealed class CertTemplateSecurityDescriptor : CommonObjectSecurity {
             effectiveRuleRights &= ~CertTemplateRights.Autoenroll;
         }
 
-        CertTemplateAccessRule existingRule = rules
+        CertTemplateAccessRule? existingRule = rules
             .Cast<CertTemplateAccessRule>()
             .FirstOrDefault(x => x.IdentityReference.Value.Equals(rule.IdentityReference.Value, StringComparison.OrdinalIgnoreCase) && x.AccessControlType == rule.AccessControlType);
-        if (existingRule != null) {
+        if (existingRule is not null) {
             RemoveAccessRule(existingRule);
             var ace = new CertTemplateAccessRule(
                 rule.IdentityReference,
@@ -151,10 +152,10 @@ public sealed class CertTemplateSecurityDescriptor : CommonObjectSecurity {
     /// <returns><strong>True</strong> if matching ACE was found and removed, otherwise <strong>False</strong>.</returns>
     public Boolean RemoveAccessRule(IdentityReference identity, AccessControlType accessType) {
         AuthorizationRuleCollection rules = GetAccessRules(true, false, typeof(NTAccount));
-        AccessRule existingRule = rules
+        AccessRule? existingRule = rules
             .Cast<CertTemplateAccessRule>()
             .FirstOrDefault(x => x.IdentityReference.Value.Equals(identity.Value, StringComparison.OrdinalIgnoreCase) && x.AccessControlType == accessType);
-        return existingRule != null && RemoveAccessRule(existingRule);
+        return existingRule is not null && RemoveAccessRule(existingRule);
     }
     /// <summary>
     /// This member is not implemented.
