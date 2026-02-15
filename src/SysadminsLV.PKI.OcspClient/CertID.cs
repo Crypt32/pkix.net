@@ -32,7 +32,7 @@ public class CertID {
             throw new ArgumentNullException(nameof(cert));
         }
         _issuerName = cert.IssuerName;
-        serialNumber = cert.GetSerialNumber().Reverse().ToArray();
+        serialNumber = cert.GetSerialNumber().Cast<Byte>().Reverse().ToArray();
         initializeFromCert(cert);
     }
 
@@ -59,7 +59,7 @@ public class CertID {
         }
         _issuerName = issuer.SubjectName;
         issuerPublicKey = issuer.GetPublicKey();
-        serialNumber = leafCert.GetSerialNumber().Reverse().ToArray();
+        serialNumber = leafCert.GetSerialNumber().Cast<Byte>().Reverse().ToArray();
         initializeFromCertAndIssuer();
     }
 
