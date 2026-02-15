@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using PKI.CertificateTemplates;
@@ -75,7 +76,11 @@ public class CATemplate {
 
         String[,] templates = propReader.GetCaTemplates();
         for (Int32 i = 0; i <= templates.GetUpperBound(0); i++) {
-            _templates.Add(CertificateTemplateFactory.CreateFromCommonNameDs(templates[i, 0]));
+            try {
+                _templates.Add(CertificateTemplateFactory.CreateFromCommonNameDs(templates[i, 0]));
+            } catch (Exception e) {
+                Console.WriteLine(e.Message);
+            }
         }
     }
     Boolean IsSupported(Int32 schemaVersion) {
