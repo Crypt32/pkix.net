@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Linq;
@@ -94,7 +95,8 @@ public sealed class DsCertificateTemplate : IAdcsCertificateTemplate {
     public CngKeyUsages CryptCngKeyUsages { get; set; }
     /// <inheritdoc />
     public String[] CryptSupportedProviders => [.. _cryptCspList];
-    public String CryptPrivateKeySDDL { get; set; }
+    /// <inheritdoc />
+    public String? CryptPrivateKeySDDL { get; set; }
     /// <inheritdoc />
     public String[] SupersededTemplates => [.. _supersededTemplates];
     /// <inheritdoc />
@@ -118,11 +120,11 @@ public sealed class DsCertificateTemplate : IAdcsCertificateTemplate {
             _             => throw new Exception("The value for 'findType' must be either 'Name', 'DisplayName' or 'OID'.")
         };
 
-        ldapPath = ldapPath.Replace("LDAP://", null);
         if (String.IsNullOrWhiteSpace(ldapPath)) {
-            throw new ArgumentException("No certificate templates match search criteria.");
+            throw new ArgumentException($"No certificate templates match '{findType}={findValue}' search criteria.");
         }
 
+        ldapPath = ldapPath.Replace("LDAP://", null);
         initializeFromDs(ldapPath);
     }
 
@@ -252,7 +254,7 @@ public sealed class DsCertificateTemplate : IAdcsCertificateTemplate {
     /// </summary>
     /// <param name="commonName">Template common name.</param>
     /// <returns>LDAP path. Can be null if template with specified name doesn't exist.</returns>
-    internal static String GetLdapPath(String commonName) {
+    internal static String? GetLdapPath(String commonName) {
         return DsUtils.Find(_baseDsPath, DsUtils.PropCN, commonName);
     }
     /// <summary>
