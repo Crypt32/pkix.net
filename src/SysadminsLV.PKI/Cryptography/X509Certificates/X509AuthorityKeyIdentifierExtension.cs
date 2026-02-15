@@ -122,7 +122,7 @@ public sealed class X509AuthorityKeyIdentifierExtension : X509Extension {
         }
         if ((type & AuthorityKeyIdentifierType.SerialNumber) > 0) {
             SerialNumber = issuer.SerialNumber;
-            rawData.AddRange(Asn1Utils.Encode(issuer.GetSerialNumber().Reverse().ToArray(), 0x82));
+            rawData.AddRange(Asn1Utils.Encode(issuer.GetSerialNumber().Cast<Byte>().Reverse().ToArray(), 0x82));
             IncludedComponents |= AuthorityKeyIdentifierType.SerialNumber;
         }
         RawData = Asn1Utils.Encode(rawData.ToArray(), 48);

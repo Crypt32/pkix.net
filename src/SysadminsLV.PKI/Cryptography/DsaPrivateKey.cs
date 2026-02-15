@@ -56,7 +56,7 @@ public sealed class DsaPrivateKey : AsymmetricKeyPair {
         BigInteger x = bigIntegerFromParameter(dsaParams.X);
         BigInteger p = bigIntegerFromParameter(dsaParams.P);
         BigInteger y = BigInteger.ModPow(g, x, p);
-        dsaParams.Y = DecodePositiveInteger(y.ToByteArray().Reverse().ToArray());
+        dsaParams.Y = DecodePositiveInteger(y.ToByteArray().Cast<Byte>().Reverse().ToArray());
     }
     static BigInteger bigIntegerFromParameter(Byte[] parameter) {
         List<Byte> arr = parameter.ToList();

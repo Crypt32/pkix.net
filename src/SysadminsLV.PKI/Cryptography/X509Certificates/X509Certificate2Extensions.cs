@@ -79,7 +79,7 @@ public static class X509Certificate2Extensions {
         }
 
         var blob = new SignedContentBlob(cert.RawData, ContentBlobType.SignedBlob);
-        String sigValue = AsnFormatter.BinaryToString(blob.Signature.Value.Reverse().ToArray(), EncodingType.HexAddress)
+        String sigValue = AsnFormatter.BinaryToString(blob.Signature.Value.Cast<Byte>().Reverse().ToArray(), EncodingType.HexAddress)
             .Replace(Environment.NewLine, Environment.NewLine + "    ");
         var sb = new StringBuilder();
 

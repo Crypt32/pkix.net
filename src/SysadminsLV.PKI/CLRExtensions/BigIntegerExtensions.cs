@@ -15,7 +15,7 @@ public static class BigIntegerExtensions {
     /// <param name="bigInteger">Current <see cref="BigInteger"/> object.</param>
     /// <returns></returns>
     public static Byte[] ToLittleEndianByteArray(this BigInteger bigInteger) {
-        return bigInteger.ToByteArray().Reverse().ToArray();
+        return bigInteger.ToByteArray().Cast<Byte>().Reverse().ToArray();
     }
     /// <summary>
     /// Initializes a <see cref="BigInteger"/> object from a binary bit string.

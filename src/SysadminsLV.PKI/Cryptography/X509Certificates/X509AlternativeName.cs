@@ -356,7 +356,7 @@ public class X509AlternativeName {
                 if (ipv4) {
                     Int32 bits = 32 - maskLength;
                     Int32 mask = ~(0 | ((Int32)Math.Pow(2, bits) - 1));
-                    bytes.AddRange(BitConverter.GetBytes(mask).Reverse());
+                    bytes.AddRange(BitConverter.GetBytes(mask).Cast<Byte>().Reverse());
                 } else {
                     // ipv6
                     Int32 maskBits = maskLength;
