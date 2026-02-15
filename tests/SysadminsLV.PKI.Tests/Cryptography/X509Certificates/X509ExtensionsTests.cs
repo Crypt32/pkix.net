@@ -7,6 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SysadminsLV.PKI.Cryptography.X509Certificates;
 using SysadminsLV.PKI.Tests.Properties;
+using X509AuthorityKeyIdentifierExtension = SysadminsLV.PKI.Cryptography.X509Certificates.X509AuthorityKeyIdentifierExtension;
 
 namespace SysadminsLV.PKI.Tests.Cryptography.X509Certificates;
 [TestClass]
