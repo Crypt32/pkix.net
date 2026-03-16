@@ -454,6 +454,10 @@ public class CertificateAuthority {
     /// <exception cref="ServerUnavailableException">
     ///     CA server is not accessible via RPC/DCOM.
     /// </exception>
+    /// <exception cref="ArgumentException">
+    ///     CA server is configured to use partitioned CRL with exclusive partition zero.
+    ///     For partitioned CRL with exclusive partition zero, use <see cref="CertPropReaderD.GetPartitionedBaseCrl"/> method.
+    /// </exception>
     /// <returns>Base CRL.</returns>
     public X509CRL2 GetBaseCRL() {
         return getCRL(false);
@@ -466,6 +470,10 @@ public class CertificateAuthority {
     /// </exception>
     /// <exception cref="ServerUnavailableException">
     ///     CA server is not accessible via RPC/DCOM.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    ///     CA server is configured to use partitioned CRL with exclusive partition zero.
+    ///     For partitioned CRL with exclusive partition zero, use <see cref="CertPropReaderD.GetPartitionedDeltaCrl"/> method.
     /// </exception>
     /// <returns>Delta CRL.</returns>
     public X509CRL2 GetDeltaCRL() {
