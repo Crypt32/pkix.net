@@ -21,8 +21,9 @@ This project requires the following NuGet packages:
 - [SysadminsLV.Asn1Parser](https://www.nuget.org/packages/SysadminsLV.Asn1Parser)
 
 ## CI/CD and NuGet Status
-![Build status](https://dev.azure.com/pkisolutions/PKI%20Libraries/_apis/build/status/SysadminsLV.PKI.Win-Nupkg)
-![image](https://vsrm.dev.azure.com/pkisolutions/_apis/public/Release/badge/8c06c171-5a0f-4829-83bc-f52ed00db68c/3/3)
+
+![Build status](https://dev.azure.com/SysadminsLV-DEV/NuGet%20Libraries/_apis/build/status/PSPKI/SysadminsLV.PKI-Nupkg)
+![image](https://vsrm.dev.azure.com/SysadminsLV-DEV/_apis/public/Release/badge/78e820b9-7991-4b20-aaae-2f6ba4c23e90/6/6)
 ![image](https://img.shields.io/nuget/v/SysadminsLV.PKI)
 
 # SysadminsLV.PKI.OcspClient package
@@ -40,8 +41,8 @@ This project requires the following NuGet packages:
 - [SysadminsLV.PKI](https://www.nuget.org/packages/SysadminsLV.PKI)
 
 ## CI/CD and NuGet Status
-![Build Status](https://dev.azure.com/pkisolutions/PKI%20Libraries/_apis/build/status/SysadminsLV.PKI.OcspClient-Nupkg)
-![image](https://vsrm.dev.azure.com/pkisolutions/_apis/public/Release/badge/8c06c171-5a0f-4829-83bc-f52ed00db68c/4/4)
+![Build Status](https://dev.azure.com/SysadminsLV-DEV/NuGet%20Libraries/_apis/build/status/SysadminsLV.PKI.OcspClient-Nupkg)
+![image](https://vsrm.dev.azure.com/SysadminsLV-DEV/_apis/public/Release/badge/78e820b9-7991-4b20-aaae-2f6ba4c23e90/5/5)
 ![image](https://img.shields.io/nuget/v/SysadminsLV.PKI.OcspClient)
 
 
@@ -61,6 +62,6 @@ This project requires the following NuGet packages:
 - [SysadminsLV.PKI.OcspClient](https://www.nuget.org/packages/SysadminsLV.PKI.OcspClient)
 
 ## CI/CD and NuGet Status
-![Build Status](https://dev.azure.com/pkisolutions/PKI%20Libraries/_apis/build/status/SysadminsLV.PKI.Win-Nupkg)
-![image](https://vsrm.dev.azure.com/pkisolutions/_apis/public/Release/badge/8c06c171-5a0f-4829-83bc-f52ed00db68c/5/5)
+![Build Status](https://dev.azure.com/SysadminsLV-DEV/NuGet%20Libraries/_apis/build/status/SysadminsLV.PKI.Win-Nupkg)
+![image](https://vsrm.dev.azure.com/SysadminsLV-DEV/_apis/public/Release/badge/78e820b9-7991-4b20-aaae-2f6ba4c23e90/4/4)
 ![image](https://img.shields.io/nuget/v/SysadminsLV.PKI.Win)
