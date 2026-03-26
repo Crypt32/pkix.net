@@ -8,7 +8,7 @@
     <Company>Sysadmins LV</Company>
     <Description>.NET Microsoft ADCS managed API</Description>
     <Product>PowerShell PKI Module</Product>
-    <Copyright>Copyright © 2012-2025, Sysadmins LV</Copyright>
+    <Copyright>Copyright © 2012-2026, Sysadmins LV</Copyright>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <PackageLicenseExpression>MS-PL</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
@@ -16,6 +16,9 @@
     <IncludeSymbols>true</IncludeSymbols>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <RootNamespace>SysadminsLV.PKI</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TF_BUILD)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
