@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="SysadminsLV.Asn1Parser" Version="1.3.0" />
-    <PackageReference Include="SysadminsLV.PKI" Version="4.3.0" />
+    <PackageReference Include="SysadminsLV.PKI" Version="4.4.0" />
     <PackageReference Include="SysadminsLV.PKI.OcspClient" Version="4.3.0" />
   </ItemGroup>
 
