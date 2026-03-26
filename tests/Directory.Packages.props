@@ -5,11 +5,11 @@
   </PropertyGroup>
   <ItemGroup>
     <!--Main-->
-    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.0" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.5" />
     <!--Unit Tests-->
-    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
-    <PackageVersion Include="MSTest.TestAdapter" Version="3.8.2" />
-    <PackageVersion Include="MSTest.TestFramework" Version="3.8.2" />
+    <PackageVersion Include="coverlet.collector" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageVersion Include="MSTest.TestAdapter" Version="4.1.0" />
+    <PackageVersion Include="MSTest.TestFramework" Version="4.1.0" />
   </ItemGroup>
 </Project>

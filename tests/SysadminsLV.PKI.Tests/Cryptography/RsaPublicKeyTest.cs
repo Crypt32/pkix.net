@@ -112,36 +112,34 @@ rwIBAw==
 
     }
 
-    [TestMethod, ExpectedException(typeof(ArgumentNullException))]
+    [TestMethod]
     public void TestNullParameter() {
         // Act
-        publicKey = new RsaPublicKey(null, KeyPkcsFormat.Pkcs8);
+        Assert.ThrowsExactly<ArgumentNullException>(() => new RsaPublicKey(null, KeyPkcsFormat.Pkcs8));
     }
 
-    [TestMethod, ExpectedException(typeof(ArgumentOutOfRangeException))]
+    [TestMethod]
     public void TestInvalidKeyFormat() {
         // Act
-        publicKey = new RsaPublicKey(pkcs1Bin, (KeyPkcsFormat)3);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new RsaPublicKey(pkcs1Bin, (KeyPkcsFormat)3));
     }
 
-    [TestMethod, ExpectedException(typeof(ArgumentException))]
+    [TestMethod]
     public void TestFakeRsaOid() {
         // Act
-        publicKey = new RsaPublicKey(fakeOidPcks8Bin, KeyPkcsFormat.Pkcs8);
+        Assert.ThrowsExactly<ArgumentException>(() => new RsaPublicKey(fakeOidPcks8Bin, KeyPkcsFormat.Pkcs8));
     }
 
-    [TestMethod, ExpectedException(typeof(Asn1InvalidTagException))]
+    [TestMethod]
     public void TestRsaPkcs1Against8() {
         // Act
-        publicKey = new RsaPublicKey(pkcs1Bin, KeyPkcsFormat.Pkcs8);
+        Assert.ThrowsExactly<Asn1InvalidTagException>(() => new RsaPublicKey(pkcs1Bin, KeyPkcsFormat.Pkcs8));
     }
 
-    [TestMethod, ExpectedException(typeof(Asn1InvalidTagException))]
+    [TestMethod]
     public void TestRsaPkcs8Against1() {
-        // Arrange
-
         // Act
-        publicKey = new RsaPublicKey(pkcs8Bin, KeyPkcsFormat.Pkcs1);
+        Assert.ThrowsExactly<Asn1InvalidTagException>(() => new RsaPublicKey(pkcs8Bin, KeyPkcsFormat.Pkcs1));
     }
 
     [TestMethod]
