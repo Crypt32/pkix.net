@@ -171,7 +171,11 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
                 // add X509Extension object to the row.
                 AdcsDbExtensionFlags flags = (AdcsDbExtensionFlags)rawFlags;
                 Boolean critical = (flags & AdcsDbExtensionFlags.Critical) != 0;
-                var baseExtension = new X509Extension((String)name, Convert.FromBase64String((String)value), critical);
+                // extension value can be null, so need to handle this
+                Byte[] extensionRawData = String.IsNullOrEmpty(value as String)
+                    ? []
+                    : Convert.FromBase64String((String)value);
+                var baseExtension = new X509Extension((String)name, extensionRawData, critical);
                 try {
                     _dictionary["ExtensionObject"] = baseExtension.ConvertExtension();
                 } catch {
