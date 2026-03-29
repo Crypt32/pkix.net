@@ -3,7 +3,7 @@
     <TargetFrameworks>net472</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Title>SysadminsLV.PKI.Win</Title>
-    <Version>4.3.0</Version>
+    <Version>4.4.0</Version>
     <Authors>Vadims Podans</Authors>
     <Company>Sysadmins LV</Company>
     <Description>.NET Microsoft ADCS managed API</Description>
