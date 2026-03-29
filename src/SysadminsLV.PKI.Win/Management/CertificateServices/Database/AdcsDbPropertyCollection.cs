@@ -172,7 +172,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
                 AdcsDbExtensionFlags flags = (AdcsDbExtensionFlags)rawFlags;
                 Boolean critical = (flags & AdcsDbExtensionFlags.Critical) != 0;
                 // extension value can be null, so need to handle this
-                Byte[] extensionRawData = String.IsNullOrEmpty(value as String)
+                Byte[] extensionRawData = String.IsNullOrWhiteSpace(value as String)
                     ? []
                     : Convert.FromBase64String((String)value);
                 var baseExtension = new X509Extension((String)name, extensionRawData, critical);
