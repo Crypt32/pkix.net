@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!--Main-->
-    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.5" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!--Unit Tests-->
     <PackageVersion Include="coverlet.collector" Version="8.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />

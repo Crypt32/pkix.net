@@ -5,6 +5,14 @@
   </Configurations>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="License.md" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/Nuget/">
+    <File Path="nuget/SysadminsLV.PKI.nuspec" />
+    <File Path="nuget/SysadminsLV.PKI.OcspClient.nuspec" />
+    <File Path="nuget/SysadminsLV.PKI.Win.nuspec" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/SysadminsLV.PKI.OcspClient.Tests/SysadminsLV.PKI.OcspClient.Tests.csproj" />
