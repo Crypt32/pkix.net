@@ -1,6 +1,6 @@
-#nullable enable
 using System;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SysadminsLV.PKI.Cryptography;
 
@@ -11,6 +11,7 @@ public class KeyPairSignatureTests {
     static readonly Byte[] _data = [1, 2, 3, 4, 5, 6, 7, 8];
     static readonly Oid _sha256 = new(AlgorithmOid.SHA256);
     static readonly Oid _sha1 = new(AlgorithmOid.SHA1);
+    static readonly Oid _sha384 = new(AlgorithmOid.SHA384);
 
     static ECDsa createEcdsa(String curve) {
         return ECDsa.Create(ECCurve.CreateFromFriendlyName(curve));
@@ -156,10 +157,63 @@ public class KeyPairSignatureTests {
         using RSA rsa = RSA.Create(2048);
         using var key = new RsaPrivateKey(rsa);
         using var signer = new CryptSigner(key, _sha256) {
-            PaddingScheme = RSASignaturePadding.Pss,
-            PssSaltByteCount = 20
+            SignatureParameters = new RsaPssParameters(_sha256, 20)
         };
         Assert.ThrowsExactly<NotSupportedException>(() => signer.SignData(_data));
+    }
+    [TestMethod]
+    public void CryptSignerSignatureParametersDriveAlgorithmIdentifier() {
+        using RSA rsa = RSA.Create(2048);
+        using var key = new RsaPrivateKey(rsa);
+        using var signer = new CryptSigner(key, _sha256);
+        Assert.AreEqual(AlgorithmOid.SHA256_RSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+
+        signer.SignatureParameters = RsaPssParameters.CreateDefault(_sha384);
+        Assert.AreEqual(AlgorithmOid.SHA384, signer.HashingAlgorithm.Value);
+        Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+        Byte[] sig = signer.SignData(_data);
+        Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.SignatureAlgorithm.Value);
+        Assert.IsTrue(signer.VerifyData(_data, sig));
+        Assert.ThrowsExactly<InvalidOperationException>(() => signer.HashingAlgorithm = _sha256);
+
+        signer.SignatureParameters = null;
+        Assert.IsNull(signer.SignatureParameters);
+        Assert.AreEqual(AlgorithmOid.SHA384_RSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+    }
+    [TestMethod]
+    public void CryptSignerRejectsIncompatibleSignatureParameters() {
+        using ECDsa ecdsa = createEcdsa("nistP256");
+        using var key = new ECDsaPrivateKey(ecdsa);
+        using var signer = new CryptSigner(key, _sha256);
+        Assert.ThrowsExactly<NotSupportedException>(() => signer.SignatureParameters = RsaPssParameters.CreateDefault(_sha256));
+        Assert.ThrowsExactly<ArgumentException>(() => signer.GetAlgorithmIdentifier(new SpecifiedEcdsaParameters(_sha1)));
+        Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, signer.GetAlgorithmIdentifier(new SpecifiedEcdsaParameters(_sha256)).AlgorithmId.Value);
+        // identifier overload doesn't change the signer
+        Assert.AreEqual(AlgorithmOid.SHA256_ECDSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+
+        signer.SignatureParameters = new SpecifiedEcdsaParameters(_sha256);
+        Byte[] sig = signer.SignData(_data);
+        Assert.IsTrue(signer.VerifyData(_data, sig));
+        Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+    }
+    sealed class TrackingSigner(X509Certificate2 certificate, Oid hash) : CryptSigner(certificate, hash) {
+        public Int32 AcquireCount { get; private set; }
+        protected override AsymmetricKeyPair? AcquirePrivateKeyPair(X509Certificate2 certificate) {
+            AcquireCount++;
+            return base.AcquirePrivateKeyPair(certificate);
+        }
+    }
+    [TestMethod]
+    public void CryptSignerAcquiresPrivateKeyLazilyThroughOverride() {
+        using ECDsa ecdsa = createEcdsa("nistP256");
+        var req = new CertificateRequest("CN=test", ecdsa, HashAlgorithmName.SHA256);
+        using X509Certificate2 cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var signer = new TrackingSigner(cert, _sha256);
+        Assert.AreEqual(0, signer.AcquireCount);
+        Byte[] sig = signer.SignData(_data);
+        signer.SignData(_data);
+        Assert.AreEqual(1, signer.AcquireCount);
+        Assert.IsTrue(signer.VerifyData(_data, sig));
     }
     [TestMethod]
     public void SignedBlobRoundTripsForEcdsaAndRsa() {

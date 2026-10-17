@@ -235,7 +235,7 @@ public sealed class PkcsSignerInfoBuilder {
         if (_authAttributes.Any() && content == null) {
             throw new ArgumentException("'content' parameter cannot be null if no authenticated attributes present.");
         }
-        if (messageSigner.PaddingScheme == RSASignaturePadding.Pss) {
+        if (messageSigner.GetAlgorithmIdentifier().AlgorithmId.Value == AlgorithmOid.RSA_PSS) {
             throw new CryptographicException("PSS padding scheme is not supported.");
         }
         signContent(messageSigner, content);

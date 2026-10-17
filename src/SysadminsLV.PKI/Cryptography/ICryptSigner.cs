@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -10,7 +11,7 @@ public interface ICryptSigner {
     /// <summary>
     /// Gets the certificate associated with the current instance of <strong>MessageSigner</strong>.
     /// </summary>
-    X509Certificate2 SignerCertificate { get; }
+    X509Certificate2? SignerCertificate { get; }
     /// <summary>
     /// Gets public key algorithm.
     /// </summary>
@@ -28,12 +29,14 @@ public interface ICryptSigner {
     /// Gets or sets signature padding scheme for RSA signature creation and validation.
     /// Default is <strong>PKCS1</strong>.
     /// </summary>
+    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureParameters instead.")]
     RSASignaturePadding PaddingScheme { get; set; }
     /// <summary>
     /// Gets or sets the size, in bytes, of the random salt to use for the PSS padding.
     /// Default value matches the hash output length: 16 bytes for MD5, 20 bytes for SHA1, 32 bytes for
     /// SHA256, 48 bytes for SHA384 and 64 bytes for SHA512 hashing algorithm.
     /// </summary>
+    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureParameters instead.")]
     Int32 PssSaltByteCount { get; set; }
     /// <summary>
     /// Signs the data with signer's private key and specified hash algorithm.
@@ -49,6 +52,7 @@ public interface ICryptSigner {
     /// <param name="hash">Hash to sign.</param>
     /// <exception cref="ArgumentNullException"><strong>hash</strong> parameter is null.</exception>
     /// <returns>Raw signature.</returns>
+    [Obsolete("Use SignData instead. Signing pre-computed hashes is not supported by all signature algorithms.")]
     Byte[] SignHash(Byte[] hash);
     /// <summary>
     /// Verifies that the specified signature matches the specified hash.
@@ -73,6 +77,7 @@ public interface ICryptSigner {
     /// <returns>
     /// <strong>True</strong> if hash matches the one stored in signature, otherwise <strong>False</strong>.
     /// </returns>
+    [Obsolete("Use VerifyData instead. Verifying pre-computed hashes is not supported by all signature algorithms.")]
     Boolean VerifyHash(Byte[] hash, Byte[] signature);
     /// <summary>
     /// Gets ASN-encoded algorithm identifier based on current configuration.

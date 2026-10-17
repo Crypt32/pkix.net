@@ -27,31 +27,36 @@ public class CryptSignerTests {
         Boolean verify = signer.VerifyData(blob.ToBeSignedData, sig);
         Assert.AreNotEqual(true, verify);
     }
+    static void setPadding(CryptSigner signer, RSASignaturePadding padding) {
+        signer.SignatureParameters = padding == RSASignaturePadding.Pss
+            ? RsaPssParameters.CreateDefault(signer.HashingAlgorithm)
+            : null;
+    }
     void hashTestSeries(X509Certificate2 cert, RSASignaturePadding padding) {
         // SHA1
         using (var signer = new CryptSigner(cert, new Oid(AlgorithmOid.SHA1))) {
-            signer.PaddingScheme = padding;
+            setPadding(signer, padding);
             signAndVerifyValid(signer);
             signAndVerifyInvalid(signer);
         }
 
         // SHA256
         using (var signer = new CryptSigner(cert, new Oid(AlgorithmOid.SHA256))) {
-            signer.PaddingScheme = padding;
+            setPadding(signer, padding);
             signAndVerifyValid(signer);
             signAndVerifyInvalid(signer);
         }
 
         // SHA384
         using (var signer = new CryptSigner(cert, new Oid(AlgorithmOid.SHA384))) {
-            signer.PaddingScheme = padding;
+            setPadding(signer, padding);
             signAndVerifyValid(signer);
             signAndVerifyInvalid(signer);
         }
 
         // SHA512
         using (var signer = new CryptSigner(cert, new Oid(AlgorithmOid.SHA512))) {
-            signer.PaddingScheme = padding;
+            setPadding(signer, padding);
             signAndVerifyValid(signer);
             signAndVerifyInvalid(signer);
         }

@@ -19,6 +19,9 @@ public class CryptSigner : ICryptSigner, IDisposable {
     AsymmetricKeyPair? pubKeyPair, privKeyPair;
     Oid hashAlgorithm;
     Oid? sigAlgorithm;
+    ISignatureParameters? sigParams;
+    RSASignaturePadding paddingScheme = RSASignaturePadding.Pkcs1;
+    Int32 pssSaltByteCount;
     KeyType keyType;
 
     /// <summary>
@@ -74,9 +77,6 @@ public class CryptSigner : ICryptSigner, IDisposable {
         ownsKeyPairs = true;
         PublicKeyAlgorithm = setKeyPair(certificate.PublicKey.GetAsymmetricKeyPair());
         hashAlgorithm = getHashAlgorithm(hashingAlgorithm ?? new Oid(DEFAULT_HASH_ALG));
-        if (certificate.HasPrivateKey) {
-            acquirePrivateKey();
-        }
     }
 
     /// <summary>
@@ -93,7 +93,13 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// </summary>
     public Oid HashingAlgorithm {
         get => new(hashAlgorithm);
-        set => hashAlgorithm = getHashAlgorithm(value);
+        set {
+            Oid newHash = getHashAlgorithm(value);
+            if (sigParams is not null && newHash.Value != sigParams.HashAlgorithm.Value) {
+                throw new InvalidOperationException("Hash algorithm is defined by SignatureParameters. Assign new parameters instead.");
+            }
+            hashAlgorithm = newHash;
+        }
     }
     /// <summary>
     /// Gets resulting signature algorithm identifier.
@@ -103,7 +109,11 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// Gets or sets signature padding scheme for RSA signature creation and validation.
     /// Default is <strong>PKCS1</strong>.
     /// </summary>
-    public RSASignaturePadding PaddingScheme { get; set; } = RSASignaturePadding.Pkcs1;
+    [Obsolete("Use SignatureParameters property with RsaPssParameters instead.")]
+    public RSASignaturePadding PaddingScheme {
+        get => paddingScheme;
+        set => paddingScheme = value ?? throw new ArgumentNullException(nameof(value));
+    }
     /// <summary>
     /// Gets or sets the size, in bytes, of the random salt to use for the PSS padding.
     /// Default value matches the hash output length: 16 bytes for MD5, 20 bytes for SHA1, 32 bytes for
@@ -113,7 +123,34 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// The cross-platform implementation supports only the salt length that is equal to the hash length. Any other
     /// value causes <see cref="NotSupportedException"/> during signing and signature verification.
     /// </remarks>
-    public Int32 PssSaltByteCount { get; set; }
+    [Obsolete("Use SignatureParameters property with RsaPssParameters instead.")]
+    public Int32 PssSaltByteCount {
+        get => pssSaltByteCount;
+        set => pssSaltByteCount = value;
+    }
+    /// <summary>
+    /// Gets or sets signature parameters: RSASSA-PSS parameters for RSA keys or specified ECDSA parameters for
+    /// ECDSA keys. When set, parameters define the hash algorithm of the signer. <strong>Null</strong> resets the signer
+    /// to the default signature format: PKCS#1 v1.5 for RSA, plain ECDSA, DSA.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The parameters are not applicable to the signer's key algorithm.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Parameters are set and the hash algorithm of the signer is changed to a different value.
+    /// </exception>
+    public ISignatureParameters? SignatureParameters {
+        get => getSignatureParameters();
+        set {
+            if (value is null) {
+                sigParams = null;
+                paddingScheme = RSASignaturePadding.Pkcs1;
+            } else {
+                validateParameters(value);
+                sigParams = value;
+                hashAlgorithm = new Oid(value.HashAlgorithm);
+            }
+            sigAlgorithm = null;
+        }
+    }
 
     // returns public key algorithm
     Oid setKeyPair(AsymmetricKeyPair keyPair) {
@@ -150,19 +187,19 @@ public class CryptSigner : ICryptSigner, IDisposable {
             case KeyType.Rsa:
                 switch (oid.Value) {
                     case AlgorithmOid.MD5: // md5
-                        PssSaltByteCount = 16;
+                        pssSaltByteCount = 16;
                         break;
                     case AlgorithmOid.SHA1: // sha1
-                        PssSaltByteCount = 20;
+                        pssSaltByteCount = 20;
                         break;
                     case AlgorithmOid.SHA256: // sha256
-                        PssSaltByteCount = 32;
+                        pssSaltByteCount = 32;
                         break;
                     case AlgorithmOid.SHA384: // sha384
-                        PssSaltByteCount = 48;
+                        pssSaltByteCount = 48;
                         break;
                     case AlgorithmOid.SHA512: // sha512
-                        PssSaltByteCount = 64;
+                        pssSaltByteCount = 64;
                         break;
                 }
                 break;
@@ -220,9 +257,8 @@ public class CryptSigner : ICryptSigner, IDisposable {
         }
     }
     Oid decodeRsaPss(Asn1Reader asn) {
-        PaddingScheme = RSASignaturePadding.Pss;
         var pssParams = RsaPssParameters.Decode(asn.GetTagRawData());
-        PssSaltByteCount = pssParams.SaltLength;
+        sigParams = pssParams;
         return pssParams.HashAlgorithm;
     }
     void getConfiguration(Byte[] algIdBlob) {
@@ -233,31 +269,37 @@ public class CryptSigner : ICryptSigner, IDisposable {
         hashAlgorithm = mapSignatureAlgorithmToHashAlgorithm(oid.Value!, asn);
     }
 
-    void acquirePrivateKey() {
-        // do not load private key again if it is already loaded
-        if (privKeyPair is not null || SignerCertificate is null) {
-            return;
-        }
+    /// <summary>
+    /// Loads a private key pair that is associated with the signer certificate. The private key is acquired lazily on
+    /// first signing operation. Derived classes can override this method to provide platform-specific key pairs
+    /// (for example, CNG-based).
+    /// </summary>
+    /// <param name="certificate">Signer certificate.</param>
+    /// <returns>
+    /// Private key pair, or <strong>null</strong> if the certificate doesn't have an accessible private key.
+    /// The signer takes ownership of the returned key pair.
+    /// </returns>
+    protected virtual AsymmetricKeyPair? AcquirePrivateKeyPair(X509Certificate2 certificate) {
         switch (keyType) {
             case KeyType.EcDsa:
-                ECDsa? ecdsa = SignerCertificate.GetECDsaPrivateKey();
-                if (ecdsa is not null) {
-                    privKeyPair = new ECDsaPrivateKey(ecdsa);
-                }
-                break;
+                ECDsa? ecdsa = certificate.GetECDsaPrivateKey();
+                return ecdsa is null ? null : new ECDsaPrivateKey(ecdsa);
             case KeyType.Rsa:
-                RSA? rsa = SignerCertificate.GetRSAPrivateKey();
-                if (rsa is not null) {
-                    privKeyPair = new RsaPrivateKey(rsa);
-                }
-                break;
+                RSA? rsa = certificate.GetRSAPrivateKey();
+                return rsa is null ? null : new RsaPrivateKey(rsa);
             case KeyType.Dsa:
                 // .NET Standard 2.0 doesn't have X509Certificate2.GetDSAPrivateKey() extension method.
-                if (SignerCertificate.PrivateKey is DSA dsa) {
-                    privKeyPair = new DsaPrivateKey(dsa);
-                }
-                break;
+                return certificate.PrivateKey is DSA dsa ? new DsaPrivateKey(dsa) : null;
+            default:
+                return null;
         }
+    }
+    void acquirePrivateKey() {
+        // do not load private key again if it is already loaded
+        if (privKeyPair is not null || SignerCertificate is null || !SignerCertificate.HasPrivateKey) {
+            return;
+        }
+        privKeyPair = AcquirePrivateKeyPair(SignerCertificate);
     }
     AsymmetricKeyPair getSigningKey() {
         acquirePrivateKey();
@@ -268,9 +310,24 @@ public class CryptSigner : ICryptSigner, IDisposable {
     }
     // PSS is the only mode that carries additional signature parameters.
     ISignatureParameters? getSignatureParameters() {
-        return keyType == KeyType.Rsa && PaddingScheme == RSASignaturePadding.Pss
-            ? new RsaPssParameters(hashAlgorithm, PssSaltByteCount)
+        if (sigParams is not null) {
+            return sigParams;
+        }
+
+        return keyType == KeyType.Rsa && paddingScheme == RSASignaturePadding.Pss
+            ? new RsaPssParameters(hashAlgorithm, pssSaltByteCount)
             : null;
+    }
+    // ensures that parameters are applicable to the key algorithm
+    void validateParameters(ISignatureParameters parameters) {
+        Boolean valid = parameters switch {
+            RsaPssParameters => keyType == KeyType.Rsa,
+            SpecifiedEcdsaParameters => keyType == KeyType.EcDsa,
+            _ => false
+        };
+        if (!valid) {
+            throw new NotSupportedException($"Signature parameters of type '{parameters.GetType().Name}' are not applicable to the key algorithm.");
+        }
     }
 
     // null-signed: the "signature" is a plain hash of data (see SignedContentBlob.Hash)
@@ -286,11 +343,13 @@ public class CryptSigner : ICryptSigner, IDisposable {
     void getSignatureAlgorithm() {
         switch (keyType) {
             case KeyType.EcDsa:
-                sigAlgorithm = new Oid($"{hashAlgorithm.FriendlyName}ECDSA"); // ECDSA
+                sigAlgorithm = sigParams is SpecifiedEcdsaParameters
+                    ? new Oid(AlgorithmOid.ECDSA_SPECIFIED)                  // specifiedECDSA
+                    : new Oid($"{hashAlgorithm.FriendlyName}ECDSA");          // ECDSA
                 break;
             case KeyType.Rsa:
-                sigAlgorithm = PaddingScheme == RSASignaturePadding.Pss
-                    ? new Oid(AlgorithmOid.RSA_PSS)                          // RSASSA-PSS
+                sigAlgorithm = getSignatureParameters() is RsaPssParameters
+                    ? new Oid(AlgorithmOid.RSA_PSS)                        // RSASSA-PSS
                     : new Oid($"{hashAlgorithm.FriendlyName}RSA");            // RSA
                 break;
             case KeyType.Dsa:
@@ -328,6 +387,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// <exception cref="InvalidOperationException">The signer doesn't have a private key.</exception>
     /// <exception cref="NotSupportedException">PSS salt length is not equal to the hash length.</exception>
     /// <returns>Raw signature.</returns>
+    [Obsolete("Use SignData instead. Signing pre-computed hashes is not supported by all signature algorithms.")]
     public Byte[] SignHash(Byte[] hash) {
         if (hash is null) {
             throw new ArgumentNullException(nameof(hash));
@@ -375,6 +435,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// <returns>
     /// <strong>True</strong> if hash matches the one stored in signature, otherwise <strong>False</strong>.
     /// </returns>
+    [Obsolete("Use VerifyData instead. Verifying pre-computed hashes is not supported by all signature algorithms.")]
     public Boolean VerifyHash(Byte[] hash, Byte[] signature) {
         if (hash is null) {
             throw new ArgumentNullException(nameof(hash));
@@ -435,21 +496,53 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// ECDSA keys. Otherwise, the parameter is ignored. Default value is <strong>false</strong>.
     /// </param>
     /// <returns>ASN-encoded algorithm identifier.</returns>
+    [Obsolete("Use GetAlgorithmIdentifier() or GetAlgorithmIdentifier(ISignatureParameters) instead.")]
     public AlgorithmIdentifier GetAlgorithmIdentifier(Boolean alternate = false) {
+        if (alternate && keyType == KeyType.EcDsa) {
+            return new SpecifiedEcdsaParameters(hashAlgorithm).ToAlgorithmIdentifier();
+        }
+
+        return GetAlgorithmIdentifier();
+    }
+    /// <summary>
+    /// Gets ASN-encoded algorithm identifier based on current configuration.
+    /// </summary>
+    /// <returns>ASN-encoded algorithm identifier.</returns>
+    public AlgorithmIdentifier GetAlgorithmIdentifier() {
+        return getAlgorithmIdentifier(getSignatureParameters());
+    }
+    /// <summary>
+    /// Gets ASN-encoded algorithm identifier for the specified signature parameters. The signer configuration is not changed.
+    /// </summary>
+    /// <param name="parameters">
+    /// Signature parameters. <strong>Null</strong> produces the default identifier for the key algorithm:
+    /// PKCS#1 v1.5 for RSA, plain ECDSA, DSA.
+    /// </param>
+    /// <exception cref="NotSupportedException">The parameters are not applicable to the signer's key algorithm.</exception>
+    /// <exception cref="ArgumentException">Hash algorithm of the parameters doesn't match the signer's hash algorithm.</exception>
+    /// <returns>ASN-encoded algorithm identifier.</returns>
+    public AlgorithmIdentifier GetAlgorithmIdentifier(ISignatureParameters? parameters) {
+        if (parameters is not null) {
+            validateParameters(parameters);
+            if (parameters.HashAlgorithm.Value != hashAlgorithm.Value) {
+                throw new ArgumentException("Hash algorithm of the parameters doesn't match the hash algorithm of the signer.", nameof(parameters));
+            }
+        }
+
+        return getAlgorithmIdentifier(parameters);
+    }
+    AlgorithmIdentifier getAlgorithmIdentifier(ISignatureParameters? parameters) {
+        if (parameters is not null) {
+            return parameters.ToAlgorithmIdentifier();
+        }
         if (sigAlgorithm is null) {
             getSignatureAlgorithm();
         }
-        switch (keyType) {
-            case KeyType.EcDsa when alternate:
-                return new SpecifiedEcdsaParameters(hashAlgorithm).ToAlgorithmIdentifier();
-            case KeyType.Rsa when PaddingScheme == RSASignaturePadding.Pss:
-                return new RsaPssParameters(hashAlgorithm, PssSaltByteCount).ToAlgorithmIdentifier();
-            case KeyType.Rsa:
-                // PKCS#1 v1.5 padding: NULL parameters
-                return new AlgorithmIdentifier(sigAlgorithm!, new Asn1Null().GetRawDataAsMemory().ToArray());
-            default:
-                return new AlgorithmIdentifier(sigAlgorithm!, Array.Empty<Byte>());
-        }
+
+        // PKCS#1 v1.5 padding: NULL parameters. Other algorithms don't have parameters.
+        return keyType == KeyType.Rsa
+            ? new AlgorithmIdentifier(sigAlgorithm!, new Asn1Null().GetRawDataAsMemory().ToArray())
+            : new AlgorithmIdentifier(sigAlgorithm!, Array.Empty<Byte>());
     }
 
     #region IDisposable implementation

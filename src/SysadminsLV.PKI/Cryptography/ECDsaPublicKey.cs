@@ -65,15 +65,15 @@ public sealed class ECDsaPublicKey : AsymmetricKeyPair {
     /// <summary>
     /// Gets the named curve object identifier.
     /// </summary>
-    public Oid CurveOid { get; private set; }
+    public Oid CurveOid { get; private set; } = null!;
     /// <summary>
     /// Gets the X coordinate of public key.
     /// </summary>
-    public Byte[] CoordinateX { get; private set; }
+    public Byte[] CoordinateX { get; private set; } = [];
     /// <summary>
     /// Gets the Y coordinate of public key.
     /// </summary>
-    public Byte[] CoordinateY { get; private set; }
+    public Byte[] CoordinateY { get; private set; } = [];
 
     void decodeFromPublicKey(PublicKey publicKey) {
         // skip first byte as it is always 0x04 for ECDSA keys
