@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -15,7 +16,7 @@ public sealed class DsaPrivateKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Private key is not DSA.";
     static readonly Oid _oid = new(AlgorithmOid.DSA);
     DSAParameters dsaParams;
-    DSA dsaKey;
+    DSA? dsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>DsaPrivateKey</strong> from a PKCS#1 or unencrypted PKCS#8 format.
@@ -126,14 +127,38 @@ public sealed class DsaPrivateKey : AsymmetricKeyPair {
         dsaParams.X = DecodePositiveInteger(asn.GetPayload());
     }
 
-    /// <inheritdoc />
-    public override AsymmetricAlgorithm GetAsymmetricKey() {
-        if (dsaKey != null) {
+    DSA getKey() {
+        if (dsaKey is not null) {
             return dsaKey;
         }
         dsaKey = DSA.Create();
         dsaKey.ImportParameters(dsaParams);
         return dsaKey;
+    }
+
+    /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Byte[] SignHashCore(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return DsaSignatureHelper.SignHash(getKey(), hash, parameters);
+    }
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return DsaSignatureHelper.VerifyHash(getKey(), hash, signature, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return EncodeRsSignature(rawSignature);
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        // DSA signature elements have the size of the subgroup order Q
+        return DecodeRsSignature(encodedSignature, getKey().ExportParameters(false).Q!.Length);
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
+    public override AsymmetricAlgorithm GetAsymmetricKey() {
+        return getKey();
     }
 
     /// <inheritdoc />

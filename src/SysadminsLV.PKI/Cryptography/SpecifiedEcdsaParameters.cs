@@ -44,7 +44,7 @@ public sealed class SpecifiedEcdsaParameters : ISignatureParameters {
 
     /// <inheritdoc />
     public Byte[] Encode() {
-        return new AlgorithmIdentifier(HashAlgorithm, new Asn1Null().GetRawData()).RawData;
+        return new AlgorithmIdentifier(HashAlgorithm, new Asn1Null().GetRawDataAsMemory().ToArray()).RawData;
     }
     /// <inheritdoc />
     public AlgorithmIdentifier ToAlgorithmIdentifier() {

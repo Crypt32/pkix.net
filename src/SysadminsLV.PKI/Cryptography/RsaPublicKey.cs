@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using SysadminsLV.Asn1Parser;
@@ -12,7 +13,7 @@ namespace SysadminsLV.PKI.Cryptography;
 public sealed class RsaPublicKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Public key algorithm is RSA.";
     static readonly Oid _oid = new(AlgorithmOid.RSA);
-    RSA rsaKey;
+    RSA? rsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>RsaPublicKey</strong> from a public key object.
@@ -102,9 +103,8 @@ public sealed class RsaPublicKey : AsymmetricKeyPair {
         decodePkcs1Key(asn.GetTagRawData());
     }
 
-    /// <inheritdoc />
-    public override AsymmetricAlgorithm GetAsymmetricKey() {
-        if (rsaKey != null) {
+    RSA getKey() {
+        if (rsaKey is not null) {
             return rsaKey;
         }
         var rsaParams = new RSAParameters {
@@ -114,6 +114,26 @@ public sealed class RsaPublicKey : AsymmetricKeyPair {
         rsaKey = RSA.Create();
         rsaKey.ImportParameters(rsaParams);
         return rsaKey;
+    }
+
+    /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return RsaSignatureHelper.VerifyHash(getKey(), hash, signature, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return (Byte[])rawSignature.Clone();
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        return (Byte[])encodedSignature.Clone();
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
+    public override AsymmetricAlgorithm GetAsymmetricKey() {
+        return getKey();
     }
 
     /// <inheritdoc />

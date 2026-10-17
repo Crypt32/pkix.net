@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Security.Cryptography;
 using SysadminsLV.Asn1Parser;
 using SysadminsLV.Asn1Parser.Universal;
@@ -12,7 +13,7 @@ public sealed class RsaPrivateKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Private key algorithm is not RSA.";
     static readonly Oid _oid = new(AlgorithmOid.RSA);
     RSAParameters rsaParameters;
-    RSA rsaKey;
+    RSA? rsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>RsaPrivateKey</strong> from a PKCS#1 or unencrypted PKCS#8 format.
@@ -130,7 +131,7 @@ public sealed class RsaPrivateKey : AsymmetricKeyPair {
         }
     }
     Byte[] exportPkcs1() {
-        RSAParameters rsaParams = rsaKey.ExportParameters(true);
+        RSAParameters rsaParams = getKey().ExportParameters(true);
         return Asn1Builder.Create()
             .AddSequence(x => x.AddInteger(0)
                              .AddDerData(EncodePositiveInteger(rsaParams.Modulus))
@@ -144,9 +145,32 @@ public sealed class RsaPrivateKey : AsymmetricKeyPair {
             .GetRawData();
     }
 
+    RSA getKey() {
+        return rsaKey ?? throw new InvalidOperationException("The key is not initialized.");
+    }
+
     /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Byte[] SignHashCore(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return RsaSignatureHelper.SignHash(getKey(), hash, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return RsaSignatureHelper.VerifyHash(getKey(), hash, signature, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return (Byte[])rawSignature.Clone();
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        return (Byte[])encodedSignature.Clone();
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
     public override AsymmetricAlgorithm GetAsymmetricKey() {
-        return rsaKey;
+        return getKey();
     }
     /// <inheritdoc />
     public override void Dispose() {

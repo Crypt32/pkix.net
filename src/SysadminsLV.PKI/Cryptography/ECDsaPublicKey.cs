@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -13,7 +14,7 @@ namespace SysadminsLV.PKI.Cryptography;
 public sealed class ECDsaPublicKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Public key algorithm is not from elliptic curve (ECC) group.";
     static readonly Oid _oid = new(AlgorithmOid.ECC);
-    ECDsa ecdsaKey;
+    ECDsa? ecdsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>ECDsaPublicKey</strong> from a public key object.
@@ -104,9 +105,8 @@ public sealed class ECDsaPublicKey : AsymmetricKeyPair {
         CoordinateY = key.Skip(key.Length / 2).ToArray();
     }
 
-    /// <inheritdoc />
-    public override AsymmetricAlgorithm GetAsymmetricKey() {
-        if (ecdsaKey != null) {
+    ECDsa getKey() {
+        if (ecdsaKey is not null) {
             return ecdsaKey;
         }
         var ecdsaParams = new ECParameters {
@@ -122,6 +122,26 @@ public sealed class ECDsaPublicKey : AsymmetricKeyPair {
         }
         ecdsaKey.ImportParameters(ecdsaParams);
         return ecdsaKey;
+    }
+
+    /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return EcdsaSignatureHelper.VerifyHash(getKey(), hash, signature, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return EncodeRsSignature(rawSignature);
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        return DecodeRsSignature(encodedSignature, (KeySize + 7) / 8);
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
+    public override AsymmetricAlgorithm GetAsymmetricKey() {
+        return getKey();
     }
 
     /// <inheritdoc />

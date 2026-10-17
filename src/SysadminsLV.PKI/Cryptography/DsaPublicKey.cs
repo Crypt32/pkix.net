@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using SysadminsLV.Asn1Parser;
@@ -13,7 +14,7 @@ public sealed class DsaPublicKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Public key algorithm is not DSA.";
     static readonly Oid _oid = new(AlgorithmOid.DSA);
     DSAParameters dsaParams;
-    DSA dsaKey;
+    DSA? dsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>DsaPublicKey</strong> from a public key object.
@@ -106,14 +107,34 @@ public sealed class DsaPublicKey : AsymmetricKeyPair {
         dsaParams.G = DecodePositiveInteger(asn.GetPayload());
     }
 
-    /// <inheritdoc />
-    public override AsymmetricAlgorithm GetAsymmetricKey() {
-        if (dsaKey != null) {
+    DSA getKey() {
+        if (dsaKey is not null) {
             return dsaKey;
         }
         dsaKey = DSA.Create();
         dsaKey.ImportParameters(dsaParams);
         return dsaKey;
+    }
+
+    /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return DsaSignatureHelper.VerifyHash(getKey(), hash, signature, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return EncodeRsSignature(rawSignature);
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        // DSA signature elements have the size of the subgroup order Q
+        return DecodeRsSignature(encodedSignature, getKey().ExportParameters(false).Q!.Length);
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
+    public override AsymmetricAlgorithm GetAsymmetricKey() {
+        return getKey();
     }
     /// <inheritdoc />
     public override void Dispose() {

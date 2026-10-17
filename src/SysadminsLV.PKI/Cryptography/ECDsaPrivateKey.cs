@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Linq;
 using System.Security.Cryptography;
 using SysadminsLV.Asn1Parser;
@@ -13,7 +14,7 @@ public sealed class ECDsaPrivateKey : AsymmetricKeyPair {
     const String ALG_ERROR = "Private key algorithm is not from elliptic curve (ECC) group.";
     static readonly Oid _oid = new(AlgorithmOid.ECC);
     ECParameters ecParameters;
-    ECDsa ecdsaKey;
+    ECDsa? ecdsaKey;
 
     /// <summary>
     /// Initializes a new instance of <strong>DsaPublicKey</strong> from an ASN.1-encoded byte array.
@@ -173,9 +174,32 @@ public sealed class ECDsaPrivateKey : AsymmetricKeyPair {
         }
     }
 
-    /// <inheritdoc />
-    public override AsymmetricAlgorithm GetAsymmetricKey() {
+    ECDsa getKey() {
         return ecdsaKey ??= ECDsa.Create(ecParameters);
+    }
+
+    /// <inheritdoc />
+    public override Int32 KeySize => getKey().KeySize;
+    /// <inheritdoc />
+    protected override Byte[] SignHashCore(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return EcdsaSignatureHelper.SignHash(getKey(), hash, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+        return EcdsaSignatureHelper.VerifyHash(getKey(), hash, signature, hashAlgorithm, parameters);
+    }
+    /// <inheritdoc />
+    public override Byte[] EncodeSignature(Byte[] rawSignature) {
+        return EncodeRsSignature(rawSignature);
+    }
+    /// <inheritdoc />
+    public override Byte[] DecodeSignature(Byte[] encodedSignature) {
+        return DecodeRsSignature(encodedSignature, (KeySize + 7) / 8);
+    }
+    /// <inheritdoc />
+    [Obsolete("Use SignData/VerifyData/KeySize members of the key pair instead.")]
+    public override AsymmetricAlgorithm GetAsymmetricKey() {
+        return getKey();
     }
     /// <inheritdoc />
     public override void Dispose() {

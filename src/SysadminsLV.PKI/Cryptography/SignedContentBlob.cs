@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -100,27 +101,15 @@ public class SignedContentBlob {
     /// </summary>
     /// <param name="signerInfo">Configured message signer object which is used to sign the data.</param>
     public void Sign(ICryptSigner signerInfo) {
-        var signature = signerInfo.SignData(ToBeSignedData).ToList();
-        if (signerInfo.PublicKeyAlgorithm.Value == AlgorithmOid.RSA) {
-            signature.Insert(0, 0);
-            Signature = new Asn1BitString(Asn1Utils.Encode(signature.ToArray(), (Byte)Asn1Type.BIT_STRING));
-        } else {
-            // ECDSA, DSA signature consist of two parts, r and s.
-            Int32 divider = signature.Count / 2;
-            var r = signature.Skip(0).Take(divider).ToList();
-            // check if most significant bit is set to 1. If set, prepend value with extra 0 byte.
-            if (r[0] > 127) { r.Insert(0, 0); }
-            
-            var s = signature.Skip(divider).Take(divider).ToList();
-            // check if most significant bit is set to 1. If set, prepend value with extra 0 byte.
-            if (s[0] > 127) { s.Insert(0, 0); }
-            var builder = new List<Byte>();
-            builder.AddRange(Asn1Utils.Encode(r.ToArray(), (Byte)Asn1Type.INTEGER));
-            builder.AddRange(Asn1Utils.Encode(s.ToArray(), (Byte)Asn1Type.INTEGER));
-            builder = new List<Byte>(Asn1Utils.Encode(builder.ToArray(), 48));
-            builder.Insert(0, 0);
-            Signature = new Asn1BitString(Asn1Utils.Encode(builder.ToArray(), (Byte)Asn1Type.BIT_STRING));
-        }
+        Byte[] rawSignature = signerInfo.SignData(ToBeSignedData);
+        // the wire format of the signature depends on the key algorithm.
+        Byte[] encodedSignature = signerInfo is CryptSigner cryptSigner
+            ? cryptSigner.EncodeSignature(rawSignature)
+            : AsymmetricKeyPair.EncodeSignature(signerInfo.PublicKeyAlgorithm, rawSignature);
+        // the first byte of BIT STRING is the number of unused bits
+        var bitString = new Byte[encodedSignature.Length + 1];
+        Buffer.BlockCopy(encodedSignature, 0, bitString, 1, encodedSignature.Length);
+        Signature = new Asn1BitString(Asn1Utils.Encode(bitString, (Byte)Asn1Type.BIT_STRING));
         SignatureAlgorithm = signerInfo.GetAlgorithmIdentifier();
         BlobType = ContentBlobType.SignedBlob;
     }

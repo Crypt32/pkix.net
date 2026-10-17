@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -144,7 +145,7 @@ Public Key: UnusedBits = 0
 
         try {
             using AsymmetricKeyPair keyPair = publicKey.GetAsymmetricKeyPair();
-            return keyPair.GetAsymmetricKey().KeySize;
+            return keyPair.KeySize;
         } catch {
             return 0;
         }
