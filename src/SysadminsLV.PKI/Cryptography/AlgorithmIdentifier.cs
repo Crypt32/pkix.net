@@ -1,4 +1,5 @@
-﻿using System;
+#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -14,9 +15,9 @@ namespace SysadminsLV.PKI.Cryptography;
 /// </summary>
 /// <remarks>This class supports PKCS#2.1 signature format.</remarks>
 public class AlgorithmIdentifier {
-    readonly List<Byte> _rawData = new();
+    readonly List<Byte> _rawData = [];
     Oid algId;
-    Byte[] param;
+    Byte[]? param;
 
     /// <summary>
     /// Initializes a new instance of the <strong>AlgorithmIdentifier</strong> class from a ASN.1-encoded
@@ -54,11 +55,12 @@ public class AlgorithmIdentifier {
     ///     are not used (such as when hashing or other algorithm group), you must pass <strong>null</strong> value to
     ///     <strong>parameters</strong> parameter.
     /// </remarks>
-    public AlgorithmIdentifier(Oid oid, Byte[] parameters) {
+    public AlgorithmIdentifier(Oid oid, Byte[]? parameters) {
         if (oid == null) {
             throw new ArgumentNullException(nameof(oid));
         }
         encode(oid, parameters);
+        algId = oid;
     }
 
     /// <summary>
@@ -69,7 +71,7 @@ public class AlgorithmIdentifier {
     /// Gets a byte array that provides encoded algorithm-specific parameters. In many cases, there are no
     /// parameters.
     /// </summary>
-    public Byte[] Parameters => param?.ToArray();
+    public Byte[]? Parameters => param?.ToArray();
     /// <summary>
     /// Gets algorithm identifier ASN.1-encoded byte array.
     /// </summary>
@@ -90,16 +92,14 @@ public class AlgorithmIdentifier {
     void encode(Oid oid, Byte[] parameters) {
         // if empty array received, then parameters is set to ASN.1 NULL type => 5, 0
         param = parameters is { Length: 0 }
-            ? new Byte[] { 5, 0 }
+            ? [5, 0]
             : parameters;
-
-        algId = oid;
-        var rawBytes = new List<Byte>(new Asn1ObjectIdentifier(oid).GetRawData());
-        if (param != null) {
-            rawBytes.AddRange(param);
+        var builder = Asn1Builder.Create().AddObjectIdentifier(oid);
+        if (param is not null) {
+            builder.AddDerData(param);
         }
-            
-        _rawData.AddRange(Asn1Utils.Encode(rawBytes.ToArray(), 48));
+        
+        _rawData.AddRange(builder.GetEncoded());
     }
 
     /// <summary>
@@ -125,10 +125,12 @@ public class AlgorithmIdentifier {
         sb.Append(
             // TODO: algorithm identifier is more than signature algorithm identifier, it is commonly used
             // TODO: structure type in X.509 and PKCS world
-            $@"Signature Algorithm:
-    Algorithm ObjectId: {AlgorithmId.Format(true)}
-    Algorithm Parameters:{algParamString}
-");
+            $"""
+             Signature Algorithm:
+                 Algorithm ObjectId: {AlgorithmId.Format(true)}
+                 Algorithm Parameters:{algParamString}
+
+             """);
         return sb.ToString();
     }
 }
