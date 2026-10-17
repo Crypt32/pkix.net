@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 namespace SysadminsLV.PKI.Cryptography;
@@ -8,9 +8,27 @@ namespace SysadminsLV.PKI.Cryptography;
 /// </summary>
 public static class AlgorithmOid {
     // public key group
-    public const String RSA             = "1.2.840.113549.1.1.1";
-    public const String DSA             = "1.2.840.10040.4.1";
-    public const String ECC             = "1.2.840.10045.2.1";
+    public const String RSA               = "1.2.840.113549.1.1.1";
+    public const String DSA               = "1.2.840.10040.4.1";
+    public const String ECC               = "1.2.840.10045.2.1";
+    // ML-DSA Group (FIPS 204)
+    public const String ML_DSA_44         = "2.16.840.1.101.3.4.3.17";
+    public const String ML_DSA_65         = "2.16.840.1.101.3.4.3.18";
+    public const String ML_DSA_87         = "2.16.840.1.101.3.4.3.19";
+    // SLH-DSA Group (FIPS 205, RFC 9909).
+    public const String SLH_DSA_SHA2_128S = "2.16.840.1.101.3.4.3.20";
+    public const String SLH_DSA_SHA2_128F = "2.16.840.1.101.3.4.3.21";
+    public const String SLH_DSA_SHA2_192S = "2.16.840.1.101.3.4.3.22";
+    public const String SLH_DSA_SHA2_192F = "2.16.840.1.101.3.4.3.23";
+    public const String SLH_DSA_SHA2_256S = "2.16.840.1.101.3.4.3.24";
+    public const String SLH_DSA_SHA2_256F = "2.16.840.1.101.3.4.3.25";
+    public const String SLH_DSA_SHAKE_128S = "2.16.840.1.101.3.4.3.26";
+    public const String SLH_DSA_SHAKE_128F = "2.16.840.1.101.3.4.3.27";
+    public const String SLH_DSA_SHAKE_192S = "2.16.840.1.101.3.4.3.28";
+    public const String SLH_DSA_SHAKE_192F = "2.16.840.1.101.3.4.3.29";
+    public const String SLH_DSA_SHAKE_256S = "2.16.840.1.101.3.4.3.30";
+    public const String SLH_DSA_SHAKE_256F = "2.16.840.1.101.3.4.3.31";
+
     // md2 group
     public const String MD2             = "1.2.840.113549.2.2";
     // md4 group
