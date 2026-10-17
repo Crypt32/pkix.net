@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -732,7 +733,7 @@ public class MessageSigner : ICryptSigner, IDisposable {
                     Byte[] mgf = new AlgorithmIdentifier(new Oid("1.2.840.113549.1.1.8"), hash).RawData;
                     parameters.AddRange(Asn1Utils.Encode(mgf, 0xa1));
                     // salt
-                    parameters.AddRange(Asn1Utils.Encode(new Asn1Integer(20).GetRawData(), 0xa2));
+                    parameters.AddRange(Asn1Utils.Encode(new Asn1Integer(PssSaltByteCount).GetRawData(), 0xa2));
                     // general PSS parameters encode
                     parameters = new List<Byte>(Asn1Utils.Encode(parameters.ToArray(), 48));
                 } else {

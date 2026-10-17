@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -201,16 +202,9 @@ public class CryptSigner : ICryptSigner, IDisposable {
     }
     Oid decodeRsaPss(Asn1Reader asn) {
         PaddingScheme = RSASignaturePadding.Pss;
-        asn.MoveNext();
-        Oid hAlgId = asn.Tag == 0xa0
-            ? new Oid(new AlgorithmIdentifier(asn.GetPayload()).AlgorithmId)
-            : new Oid(AlgorithmOid.SHA1);
-        // feed asn reader to salt identifier
-        while (asn.MoveNextSibling() && asn.Tag != 0xa2) { }
-        PssSaltByteCount = asn.Tag == 0xa2
-            ? (Int32)new Asn1Integer(asn.GetPayload()).Value
-            : 20;
-        return hAlgId;
+        var pssParams = RsaPssParameters.Decode(asn.GetTagRawData());
+        PssSaltByteCount = pssParams.SaltLength;
+        return pssParams.HashAlgorithm;
     }
     void getConfiguration(Byte[] algIdBlob) {
         var asn = new Asn1Reader(algIdBlob);
@@ -468,43 +462,17 @@ public class CryptSigner : ICryptSigner, IDisposable {
         if (sigAlgorithm == null) {
             getSignatureAlgorithm();
         }
-        Oid algId = sigAlgorithm;
-        var parameters = new List<Byte>();
         switch (keyType) {
-            case KeyType.EcDsa: // ECDSA
-                if (alternate) {
-                    // specifiedECDSA
-                    algId = new Oid(AlgorithmOid.ECDSA_SPECIFIED); // only here we override algorithm OID
-                    parameters
-                        .AddRange(
-                            new AlgorithmIdentifier(hashAlgorithm, new Asn1Null().GetRawData()).RawData
-                        );
-                }
-                break;
-            case KeyType.Rsa: // RSA
-                              // only RSA supports parameters. For PKCS1 padding: NULL, for PSS padding: 
-                              // RSASSA-PSS-params ::= SEQUENCE {
-                              //     hashAlgorithm      [0] HashAlgorithm    DEFAULT sha1,
-                              //     maskGenAlgorithm   [1] MaskGenAlgorithm DEFAULT mgf1SHA1,
-                              //     saltLength         [2] INTEGER          DEFAULT 20,
-                              //     trailerField       [3] TrailerField     DEFAULT trailerFieldBC
-                              // }
-                if (PaddingScheme == RSASignaturePadding.Pss) {
-                    Byte[] hash = new AlgorithmIdentifier(hashAlgorithm, null).RawData;
-                    parameters.AddRange(Asn1Utils.Encode(hash, 0xa0));
-                    // mask generation function: mgf1
-                    Byte[] mgf = new AlgorithmIdentifier(new Oid("1.2.840.113549.1.1.8"), hash).RawData;
-                    parameters.AddRange(Asn1Utils.Encode(mgf, 0xa1));
-                    // salt
-                    parameters.AddRange(Asn1Utils.Encode(new Asn1Integer(20).GetRawData(), 0xa2));
-                    // general PSS parameters encode
-                    parameters = new List<Byte>(Asn1Utils.Encode(parameters.ToArray(), 48));
-                } else {
-                    parameters.AddRange(new Asn1Null().GetRawData());
-                }
-                break;
+            case KeyType.EcDsa when alternate:
+                return new SpecifiedEcdsaParameters(hashAlgorithm).ToAlgorithmIdentifier();
+            case KeyType.Rsa when PaddingScheme == RSASignaturePadding.Pss:
+                return new RsaPssParameters(hashAlgorithm, PssSaltByteCount).ToAlgorithmIdentifier();
+            case KeyType.Rsa:
+                // PKCS#1 v1.5 padding: NULL parameters
+                return new AlgorithmIdentifier(sigAlgorithm, new Asn1Null().GetRawData());
+            default:
+                return new AlgorithmIdentifier(sigAlgorithm, Array.Empty<Byte>());
         }
-        return new AlgorithmIdentifier(algId, parameters.ToArray());
     }
 
     #region IDisposable implementation
