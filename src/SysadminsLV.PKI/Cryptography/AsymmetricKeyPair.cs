@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,7 +43,7 @@ public abstract class AsymmetricKeyPair : IDisposable {
     /// <returns></returns>
     protected static Byte[] DecodePositiveInteger(Byte[] rawInteger) {
         return rawInteger[0] == 0
-            ? rawInteger.Skip(1).ToArray()
+            ? [.. rawInteger.Skip(1)]
             : rawInteger;
     }
 
@@ -108,7 +108,7 @@ public abstract class AsymmetricKeyPair : IDisposable {
     }
     static Byte[] trimLeadingZeros(IEnumerable<Byte> value) {
         Byte[] trimmed = value.SkipWhile(x => x == 0).ToArray();
-        return trimmed.Length == 0 ? new Byte[] { 0 } : trimmed;
+        return trimmed.Length == 0 ? [0] : trimmed;
     }
     /// <summary>
     /// Encodes a raw signature to the format that is stored in the <strong>signatureValue</strong> field of
