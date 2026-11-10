@@ -75,6 +75,7 @@ public abstract class AsymmetricKeyPair : IDisposable {
             throw new ArgumentException("Signature must consist of two equally-sized integers.", nameof(rawSignature));
         }
         Int32 half = rawSignature.Length / 2;
+
         return Asn1Builder.Create()
             .AddDerData(EncodePositiveInteger(trimLeadingZeros(rawSignature.Take(half))))
             .AddDerData(EncodePositiveInteger(trimLeadingZeros(rawSignature.Skip(half))))
@@ -107,7 +108,8 @@ public abstract class AsymmetricKeyPair : IDisposable {
         return raw;
     }
     static Byte[] trimLeadingZeros(IEnumerable<Byte> value) {
-        Byte[] trimmed = value.SkipWhile(x => x == 0).ToArray();
+        Byte[] trimmed = [.. value.SkipWhile(x => x == 0)];
+
         return trimmed.Length == 0 ? [0] : trimmed;
     }
     /// <summary>
@@ -115,153 +117,283 @@ public abstract class AsymmetricKeyPair : IDisposable {
     /// X.509 certificates, CRLs, CSRs and other signed structures, based on public key algorithm only.
     /// </summary>
     internal static Byte[] EncodeSignature(Oid keyAlgorithm, Byte[] rawSignature) {
-        switch (keyAlgorithm.Value) {
-            case AlgorithmOid.ECC:
-            case AlgorithmOid.DSA:
-                return EncodeRsSignature(rawSignature);
-            default:
-                // RSA and post-quantum algorithms store raw signature bytes.
-                return rawSignature.ToArray();
-        }
+        return keyAlgorithm.Value switch {
+            AlgorithmOid.ECC or AlgorithmOid.DSA => EncodeRsSignature(rawSignature),
+            _ => [.. rawSignature]
+        };
     }
 
     /// <summary>
-    /// Signs the data with the private key.
+    /// Creates a signature scheme that is supported by the key pair.
+    /// </summary>
+    /// <param name="hashAlgorithm">
+    /// Optional hash algorithm. Default is <strong>SHA256</strong> (<strong>SHA1</strong> for DSA). Algorithms that don't
+    /// use a separate hash ignore this parameter.
+    /// </param>
+    /// <param name="alternate">
+    /// Specifies whether the alternate signature format is used: RSASSA-PSS for RSA keys and ECDSA-with-Specified for
+    /// ECDSA keys. The rest is determined by the key algorithm.
+    /// </param>
+    /// <exception cref="NotSupportedException">
+    /// The key pair doesn't have the alternate format, or the hash algorithm is not applicable.
+    /// </exception>
+    /// <returns>Signature scheme that can be passed to <see cref="SignData(Byte[], SignatureScheme)"/>.</returns>
+    public SignatureScheme CreateSignatureScheme(Oid? hashAlgorithm = null, Boolean alternate = false) {
+        return CreateSignatureSchemeCore(hashAlgorithm, alternate);
+    }
+    /// <summary>
+    /// Signs the data with the private key by using the default signature scheme of the key pair with the specified hash
+    /// algorithm (for example, PKCS#1 v1.5 for RSA).
     /// </summary>
     /// <param name="data">Data to sign.</param>
     /// <param name="hashAlgorithm">Hash algorithm that is used to hash the data.</param>
-    /// <param name="parameters">
-    /// Optional signature parameters. Pass <strong>null</strong> for default signature format of the algorithm.
-    /// </param>
     /// <exception cref="ArgumentNullException"><strong>data</strong> or <strong>hashAlgorithm</strong> parameter is null.</exception>
     /// <exception cref="InvalidOperationException">The key pair contains only public key.</exception>
-    /// <exception cref="NotSupportedException">The key doesn't support specified hash algorithm or parameters.</exception>
+    /// <exception cref="NotSupportedException">The key doesn't support specified hash algorithm.</exception>
     /// <returns>Raw signature. For ECDSA and DSA it is concatenated <strong>r</strong> and <strong>s</strong> values.</returns>
-    public Byte[] SignData(Byte[] data, Oid hashAlgorithm, ISignatureParameters? parameters = null) {
+    public Byte[] SignData(Byte[] data, Oid hashAlgorithm) {
+        if (hashAlgorithm is null) {
+            throw new ArgumentNullException(nameof(hashAlgorithm));
+        }
+
+        return SignData(data, CreateSignatureScheme(hashAlgorithm));
+    }
+    /// <summary>
+    /// Signs the data with the private key by using the specified signature scheme.
+    /// </summary>
+    /// <param name="data">Data to sign.</param>
+    /// <param name="scheme">Signature scheme.</param>
+    /// <exception cref="ArgumentNullException"><strong>data</strong> or <strong>scheme</strong> parameter is null.</exception>
+    /// <exception cref="InvalidOperationException">The key pair contains only public key.</exception>
+    /// <exception cref="NotSupportedException">The scheme is not applicable to the key or is not implemented by it.</exception>
+    /// <returns>Raw signature. For ECDSA and DSA it is concatenated <strong>r</strong> and <strong>s</strong> values.</returns>
+    public Byte[] SignData(Byte[] data, SignatureScheme scheme) {
         if (data is null) {
             throw new ArgumentNullException(nameof(data));
         }
-        if (hashAlgorithm is null) {
-            throw new ArgumentNullException(nameof(hashAlgorithm));
+        if (scheme is null) {
+            throw new ArgumentNullException(nameof(scheme));
         }
+        ensureScheme(scheme);
         ensurePrivateKey();
-        return SignDataCore(data, hashAlgorithm, parameters);
+
+        return SignDataCore(data, scheme);
     }
     /// <summary>
-    /// Signs the hash with the private key.
+    /// Signs the hash with the private key by using the default signature scheme of the key pair with the specified hash
+    /// algorithm.
     /// </summary>
     /// <param name="hash">Hash to sign.</param>
     /// <param name="hashAlgorithm">Hash algorithm that was used to compute the hash.</param>
-    /// <param name="parameters">
-    /// Optional signature parameters. Pass <strong>null</strong> for default signature format of the algorithm.
-    /// </param>
     /// <exception cref="ArgumentNullException"><strong>hash</strong> or <strong>hashAlgorithm</strong> parameter is null.</exception>
     /// <exception cref="InvalidOperationException">The key pair contains only public key.</exception>
     /// <exception cref="NotSupportedException">
-    /// The key doesn't support signing pre-computed hash (such as post-quantum algorithms), specified hash algorithm
-    /// or parameters.
+    /// The key doesn't support signing pre-computed hash (such as post-quantum algorithms) or specified hash algorithm.
     /// </exception>
     /// <returns>Raw signature.</returns>
-    public Byte[] SignHash(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters = null) {
-        if (hash is null) {
-            throw new ArgumentNullException(nameof(hash));
-        }
+    public Byte[] SignHash(Byte[] hash, Oid hashAlgorithm) {
         if (hashAlgorithm is null) {
             throw new ArgumentNullException(nameof(hashAlgorithm));
         }
-        ensurePrivateKey();
-        return SignHashCore(hash, hashAlgorithm, parameters);
+
+        return SignHash(hash, CreateSignatureScheme(hashAlgorithm));
     }
     /// <summary>
-    /// Verifies that the signature matches the data.
+    /// Signs the hash with the private key by using the specified signature scheme.
+    /// </summary>
+    /// <param name="hash">Hash to sign.</param>
+    /// <param name="scheme">Signature scheme. The hash algorithm of the scheme must be the one that was used to compute the hash.</param>
+    /// <exception cref="ArgumentNullException"><strong>hash</strong> or <strong>scheme</strong> parameter is null.</exception>
+    /// <exception cref="InvalidOperationException">The key pair contains only public key.</exception>
+    /// <exception cref="NotSupportedException">
+    /// The key doesn't support signing pre-computed hash (such as post-quantum algorithms), or the scheme is not applicable
+    /// to the key or is not implemented by it.
+    /// </exception>
+    /// <returns>Raw signature.</returns>
+    public Byte[] SignHash(Byte[] hash, SignatureScheme scheme) {
+        if (hash is null) {
+            throw new ArgumentNullException(nameof(hash));
+        }
+        if (scheme is null) {
+            throw new ArgumentNullException(nameof(scheme));
+        }
+        ensureScheme(scheme);
+        ensurePrivateKey();
+
+        return SignHashCore(hash, scheme);
+    }
+    /// <summary>
+    /// Verifies that the signature matches the data by using the default signature scheme of the key pair with the
+    /// specified hash algorithm.
     /// </summary>
     /// <param name="data">The data that was signed.</param>
     /// <param name="signature">Raw signature to verify.</param>
     /// <param name="hashAlgorithm">Hash algorithm that is used to hash the data.</param>
-    /// <param name="parameters">
-    /// Optional signature parameters. Pass <strong>null</strong> for default signature format of the algorithm.
-    /// </param>
     /// <exception cref="ArgumentNullException">
     /// <strong>data</strong>, <strong>signature</strong> or <strong>hashAlgorithm</strong> parameter is null.
     /// </exception>
-    /// <exception cref="NotSupportedException">The key doesn't support specified hash algorithm or parameters.</exception>
+    /// <exception cref="NotSupportedException">The key doesn't support specified hash algorithm.</exception>
     /// <returns><strong>True</strong> if signature is valid, otherwise <strong>False</strong>.</returns>
-    public Boolean VerifyData(Byte[] data, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters = null) {
+    public Boolean VerifyData(Byte[] data, Byte[] signature, Oid hashAlgorithm) {
+        if (hashAlgorithm is null) {
+            throw new ArgumentNullException(nameof(hashAlgorithm));
+        }
+
+        return VerifyData(data, signature, CreateSignatureScheme(hashAlgorithm));
+    }
+    /// <summary>
+    /// Verifies that the signature matches the data by using the specified signature scheme.
+    /// </summary>
+    /// <param name="data">The data that was signed.</param>
+    /// <param name="signature">Raw signature to verify.</param>
+    /// <param name="scheme">Signature scheme.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <strong>data</strong>, <strong>signature</strong> or <strong>scheme</strong> parameter is null.
+    /// </exception>
+    /// <exception cref="NotSupportedException">The scheme is not applicable to the key or is not implemented by it.</exception>
+    /// <returns><strong>True</strong> if signature is valid, otherwise <strong>False</strong>.</returns>
+    public Boolean VerifyData(Byte[] data, Byte[] signature, SignatureScheme scheme) {
         if (data is null) {
             throw new ArgumentNullException(nameof(data));
         }
         if (signature is null) {
             throw new ArgumentNullException(nameof(signature));
         }
-        if (hashAlgorithm is null) {
-            throw new ArgumentNullException(nameof(hashAlgorithm));
+        if (scheme is null) {
+            throw new ArgumentNullException(nameof(scheme));
         }
-        return VerifyDataCore(data, signature, hashAlgorithm, parameters);
+        ensureScheme(scheme);
+
+        return VerifyDataCore(data, signature, scheme);
     }
     /// <summary>
-    /// Verifies that the signature matches the hash.
+    /// Verifies that the signature matches the hash by using the default signature scheme of the key pair with the
+    /// specified hash algorithm.
     /// </summary>
     /// <param name="hash">The hash value of the signed data.</param>
     /// <param name="signature">Raw signature to verify.</param>
     /// <param name="hashAlgorithm">Hash algorithm that was used to compute the hash.</param>
-    /// <param name="parameters">
-    /// Optional signature parameters. Pass <strong>null</strong> for default signature format of the algorithm.
-    /// </param>
     /// <exception cref="ArgumentNullException">
     /// <strong>hash</strong>, <strong>signature</strong> or <strong>hashAlgorithm</strong> parameter is null.
     /// </exception>
     /// <exception cref="NotSupportedException">
-    /// The key doesn't support verifying pre-computed hash (such as post-quantum algorithms), specified hash algorithm
-    /// or parameters.
+    /// The key doesn't support verifying pre-computed hash (such as post-quantum algorithms) or specified hash algorithm.
     /// </exception>
     /// <returns><strong>True</strong> if signature is valid, otherwise <strong>False</strong>.</returns>
-    public Boolean VerifyHash(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters = null) {
+    public Boolean VerifyHash(Byte[] hash, Byte[] signature, Oid hashAlgorithm) {
+        if (hashAlgorithm is null) {
+            throw new ArgumentNullException(nameof(hashAlgorithm));
+        }
+
+        return VerifyHash(hash, signature, CreateSignatureScheme(hashAlgorithm));
+    }
+    /// <summary>
+    /// Verifies that the signature matches the hash by using the specified signature scheme.
+    /// </summary>
+    /// <param name="hash">The hash value of the signed data.</param>
+    /// <param name="signature">Raw signature to verify.</param>
+    /// <param name="scheme">Signature scheme. The hash algorithm of the scheme must be the one that was used to compute the hash.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <strong>hash</strong>, <strong>signature</strong> or <strong>scheme</strong> parameter is null.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// The key doesn't support verifying pre-computed hash (such as post-quantum algorithms), or the scheme is not applicable
+    /// to the key or is not implemented by it.
+    /// </exception>
+    /// <returns><strong>True</strong> if signature is valid, otherwise <strong>False</strong>.</returns>
+    public Boolean VerifyHash(Byte[] hash, Byte[] signature, SignatureScheme scheme) {
         if (hash is null) {
             throw new ArgumentNullException(nameof(hash));
         }
         if (signature is null) {
             throw new ArgumentNullException(nameof(signature));
         }
-        if (hashAlgorithm is null) {
-            throw new ArgumentNullException(nameof(hashAlgorithm));
+        if (scheme is null) {
+            throw new ArgumentNullException(nameof(scheme));
         }
-        return VerifyHashCore(hash, signature, hashAlgorithm, parameters);
+        ensureScheme(scheme);
+
+        return VerifyHashCore(hash, signature, scheme);
+    }
+    void ensureScheme(SignatureScheme scheme) {
+        if (scheme.IsNoSign) {
+            throw new NotSupportedException($"The scheme '{scheme.AlgorithmId.Format(true)}' doesn't use a key.");
+        }
+        if (scheme.KeyAlgorithm?.Value != Oid.Value) {
+            throw new NotSupportedException($"The scheme '{scheme.AlgorithmId.Format(true)}' is not applicable to the key algorithm '{Oid.Value}'.");
+        }
     }
     void ensurePrivateKey() {
         if (PublicOnly) {
             throw new InvalidOperationException("The key pair doesn't contain a private key.");
         }
     }
+    // gets the hash algorithm of hash-based schemes.
+    static Oid getHashAlgorithm(SignatureScheme scheme) {
+        return scheme.HashAlgorithm ?? throw new NotSupportedException($"The scheme '{scheme.AlgorithmId.Format(true)}' is not based on a separate hash algorithm.");
+    }
 
+    /// <summary>
+    /// Creates a signature scheme. By default, supports RSA (PKCS#1 v1.5 and PSS), ECDSA (classic and specified) and DSA.
+    /// Algorithms that are not based on a separate hash (post-quantum) must override this method.
+    /// </summary>
+    protected virtual SignatureScheme CreateSignatureSchemeCore(Oid? hashAlgorithm, Boolean alternate) {
+        switch (Oid.Value) {
+            case AlgorithmOid.RSA:
+                Oid rsaHash = hashAlgorithm ?? new Oid(AlgorithmOid.SHA256);
+                // alternate format of RSA is RSASSA-PSS
+                return alternate
+                    ? SignatureScheme.CreatePss(rsaHash)
+                    : SignatureScheme.CreateClassic(Oid, rsaHash);
+            case AlgorithmOid.ECC:
+                Oid ecHash = hashAlgorithm ?? new Oid(AlgorithmOid.SHA256);
+                // alternate format of ECDSA is ECDSA-with-Specified
+                return alternate
+                    ? SignatureScheme.CreateSpecifiedEcdsa(ecHash)
+                    : SignatureScheme.CreateClassic(Oid, ecHash);
+            case AlgorithmOid.DSA:
+                if (alternate) {
+                    throw new NotSupportedException("DSA keys don't have alternate signature format.");
+                }
+                // only SHA1 is supported.
+                return SignatureScheme.CreateClassic(Oid, hashAlgorithm ?? new Oid(AlgorithmOid.SHA1));
+            default:
+                throw new NotSupportedException($"The key algorithm '{Oid.Value}' doesn't support signature schemes.");
+        }
+    }
     /// <summary>
     /// Signs the data. By default, hashes the data and signs the hash by using <see cref="SignHashCore"/>.
     /// Algorithms that sign the message itself must override this method.
     /// </summary>
-    protected virtual Byte[] SignDataCore(Byte[] data, Oid hashAlgorithm, ISignatureParameters? parameters) {
-        return SignHashCore(HashUtils.ComputeHash(hashAlgorithm, data), hashAlgorithm, parameters);
+    protected virtual Byte[] SignDataCore(Byte[] data, SignatureScheme scheme) {
+        Oid hashAlgorithm = getHashAlgorithm(scheme);
+
+        return SignHashCore(HashUtils.ComputeHash(hashAlgorithm, data), scheme);
     }
     /// <summary>
     /// Signs the hash. By default, throws <see cref="NotSupportedException"/>.
     /// </summary>
-    protected virtual Byte[] SignHashCore(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters) {
+    protected virtual Byte[] SignHashCore(Byte[] hash, SignatureScheme scheme) {
         throw new NotSupportedException("The algorithm doesn't support signing of pre-computed hash.");
     }
     /// <summary>
     /// Verifies the signature. By default, hashes the data and verifies the hash by using <see cref="VerifyHashCore"/>.
     /// Algorithms that sign the message itself must override this method.
     /// </summary>
-    protected virtual Boolean VerifyDataCore(Byte[] data, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
-        return VerifyHashCore(HashUtils.ComputeHash(hashAlgorithm, data), signature, hashAlgorithm, parameters);
+    protected virtual Boolean VerifyDataCore(Byte[] data, Byte[] signature, SignatureScheme scheme) {
+        Oid hashAlgorithm = getHashAlgorithm(scheme);
+
+        return VerifyHashCore(HashUtils.ComputeHash(hashAlgorithm, data), signature, scheme);
     }
     /// <summary>
     /// Verifies the signature for a hash. By default, throws <see cref="NotSupportedException"/>.
     /// </summary>
-    protected virtual Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
+    protected virtual Boolean VerifyHashCore(Byte[] hash, Byte[] signature, SignatureScheme scheme) {
         throw new NotSupportedException("The algorithm doesn't support verification of pre-computed hash.");
     }
 
     /// <summary>
-    /// Encodes a raw signature that is returned by <see cref="SignData"/> to the format that is stored in the
+    /// Encodes a raw signature that is returned by <see cref="SignData(Byte[], SignatureScheme)"/> to the format that is stored in the
     /// <strong>signatureValue</strong> field of signed structures (without BIT STRING header and unused-bits byte).
     /// </summary>
     /// <param name="rawSignature">Raw signature.</param>
@@ -269,7 +401,7 @@ public abstract class AsymmetricKeyPair : IDisposable {
     public abstract Byte[] EncodeSignature(Byte[] rawSignature);
     /// <summary>
     /// Decodes a signature that is stored in the <strong>signatureValue</strong> field of signed structures to
-    /// a raw signature that is accepted by <see cref="VerifyData"/>. This is an inverse of <see cref="EncodeSignature(Byte[])"/>.
+    /// a raw signature that is accepted by <see cref="VerifyData(Byte[], Byte[], SignatureScheme)"/>. This is an inverse of <see cref="EncodeSignature(Byte[])"/>.
     /// </summary>
     /// <param name="encodedSignature">Encoded signature.</param>
     /// <returns>Raw signature.</returns>
