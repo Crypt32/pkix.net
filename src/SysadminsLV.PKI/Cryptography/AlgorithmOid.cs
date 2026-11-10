@@ -59,16 +59,18 @@ public static class AlgorithmOid {
     public const String ECDSA_SPECIFIED = "1.2.840.10045.4.3";
 
     // ECC named curves
-    public const String SecP160R1       = "1.3.132.0.8";
-    public const String SecP160K1       = "1.3.132.0.9";
-    public const String SecP256K1       = "1.3.132.0.10";
-    public const String SecP160R2       = "1.3.132.0.30";
-    public const String SecP192K1       = "1.3.132.0.31";
-    public const String SecP224K1       = "1.3.132.0.32";
-    public const String NistP224        = "1.3.132.0.33";
-    public const String ECDSA_P384      = "1.3.132.0.34";
-    public const String ECDSA_P521      = "1.3.132.0.35";
-    public const String ECDSA_P256      = "1.2.840.10045.3.1.7";
+    public const String SecP160R1        = "1.3.132.0.8";
+    public const String SecP160K1        = "1.3.132.0.9";
+    public const String SecP256K1        = "1.3.132.0.10";
+    public const String SecP160R2        = "1.3.132.0.30";
+    public const String SecP192K1        = "1.3.132.0.31";
+    public const String SecP224K1        = "1.3.132.0.32";
+    public const String NistP224         = "1.3.132.0.33";
+    public const String ECDSA_P384       = "1.3.132.0.34";
+    public const String ECDSA_P521       = "1.3.132.0.35";
+    public const String ECDSA_P256       = "1.2.840.10045.3.1.7";
+    public const String BRAINPOOL_P256R1 = "1.3.36.3.3.2.8.1.1.7";
+    public const String BRAINPOOL_P384R1 = "1.3.36.3.3.2.8.1.1.11";
 
     // ecdsa
     // ecdsa
