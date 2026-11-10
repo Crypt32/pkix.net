@@ -10,21 +10,19 @@ namespace SysadminsLV.PKI.Cryptography;
 /// Represents ECDSA-with-Specified signature parameters (RFC 5758). The parameters are a hash algorithm
 /// identifier.
 /// </summary>
-public sealed class SpecifiedEcdsaParameters : ISignatureParameters {
+public sealed class SpecifiedEcdsaParameters : ISignatureSchemeParams {
     /// <summary>
     /// Initializes a new instance of the <strong>SpecifiedEcdsaParameters</strong> class from a hash algorithm.
     /// </summary>
     /// <param name="hashAlgorithm">Hash algorithm object identifier.</param>
     /// <exception cref="ArgumentNullException"><strong>hashAlgorithm</strong> parameter is null.</exception>
-    public SpecifiedEcdsaParameters(Oid hashAlgorithm) {
+    internal SpecifiedEcdsaParameters(Oid hashAlgorithm) {
         if (hashAlgorithm is null) {
             throw new ArgumentNullException(nameof(hashAlgorithm));
         }
         HashAlgorithm = new Oid(hashAlgorithm.Value);
     }
 
-    /// <inheritdoc />
-    public Oid SignatureAlgorithm => new(AlgorithmOid.ECDSA_SPECIFIED);
     /// <inheritdoc />
     public Oid HashAlgorithm { get; }
 
@@ -35,7 +33,7 @@ public sealed class SpecifiedEcdsaParameters : ISignatureParameters {
     /// <exception cref="ArgumentNullException"><strong>rawData</strong> parameter is null.</exception>
     /// <exception cref="Asn1InvalidTagException">Data is not a SEQUENCE.</exception>
     /// <returns>ECDSA-with-Specified parameters.</returns>
-    public static SpecifiedEcdsaParameters Decode(Byte[] rawData) {
+    internal static SpecifiedEcdsaParameters Decode(Byte[] rawData) {
         if (rawData is null) {
             throw new ArgumentNullException(nameof(rawData));
         }
@@ -45,9 +43,5 @@ public sealed class SpecifiedEcdsaParameters : ISignatureParameters {
     /// <inheritdoc />
     public Byte[] Encode() {
         return new AlgorithmIdentifier(HashAlgorithm, new Asn1Null().GetRawDataAsMemory().ToArray()).RawData;
-    }
-    /// <inheritdoc />
-    public AlgorithmIdentifier ToAlgorithmIdentifier() {
-        return new AlgorithmIdentifier(SignatureAlgorithm, Encode());
     }
 }

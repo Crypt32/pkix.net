@@ -21,8 +21,7 @@ namespace SysadminsLV.PKI.Cryptography;
 /// Only MGF1 mask generation function and the default trailer field (<strong>1</strong>) are supported.
 /// When encoding, all fields except trailer field are written explicitly.
 /// </remarks>
-public sealed class RsaPssParameters : ISignatureParameters {
-    const String MGF1_OID = "1.2.840.113549.1.1.8";
+public sealed class RsaPssParameters : ISignatureSchemeParams {
     const Int32 DEFAULT_SALT_LENGTH = 20;
 
     /// <summary>
@@ -33,7 +32,7 @@ public sealed class RsaPssParameters : ISignatureParameters {
     /// <param name="saltLength">Salt length in bytes.</param>
     /// <exception cref="ArgumentNullException"><strong>hashAlgorithm</strong> parameter is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><strong>saltLength</strong> is negative.</exception>
-    public RsaPssParameters(Oid hashAlgorithm, Int32 saltLength) : this(hashAlgorithm, hashAlgorithm, saltLength) { }
+    internal RsaPssParameters(Oid hashAlgorithm, Int32 saltLength) : this(hashAlgorithm, hashAlgorithm, saltLength) { }
     RsaPssParameters(Oid hashAlgorithm, Oid maskGenHashAlgorithm, Int32 saltLength) {
         if (hashAlgorithm is null) {
             throw new ArgumentNullException(nameof(hashAlgorithm));
@@ -46,8 +45,6 @@ public sealed class RsaPssParameters : ISignatureParameters {
         SaltLength = saltLength;
     }
 
-    /// <inheritdoc />
-    public Oid SignatureAlgorithm => new(AlgorithmOid.RSA_PSS);
     /// <inheritdoc />
     public Oid HashAlgorithm { get; }
     /// <summary>
@@ -68,7 +65,7 @@ public sealed class RsaPssParameters : ISignatureParameters {
     /// <exception cref="ArgumentNullException"><strong>hashAlgorithm</strong> parameter is null.</exception>
     /// <exception cref="ArgumentException">Hash algorithm is not supported.</exception>
     /// <returns>PSS parameters.</returns>
-    public static RsaPssParameters CreateDefault(Oid hashAlgorithm) {
+    internal static RsaPssParameters CreateDefault(Oid hashAlgorithm) {
         if (hashAlgorithm is null) {
             throw new ArgumentNullException(nameof(hashAlgorithm));
         }
@@ -80,7 +77,7 @@ public sealed class RsaPssParameters : ISignatureParameters {
     /// <param name="hashAlgorithm">Hash algorithm object identifier.</param>
     /// <exception cref="ArgumentException">Hash algorithm is not supported.</exception>
     /// <returns>Digest length in bytes.</returns>
-    public static Int32 GetHashLength(Oid hashAlgorithm) {
+    internal static Int32 GetHashLength(Oid hashAlgorithm) {
         if (hashAlgorithm is null) {
             throw new ArgumentNullException(nameof(hashAlgorithm));
         }
@@ -102,7 +99,7 @@ public sealed class RsaPssParameters : ISignatureParameters {
     /// <exception cref="Asn1InvalidTagException">Data is not a SEQUENCE.</exception>
     /// <exception cref="NotSupportedException">Mask generation function or trailer field is not supported.</exception>
     /// <returns>PSS parameters.</returns>
-    public static RsaPssParameters Decode(Byte[] rawData) {
+    internal static RsaPssParameters Decode(Byte[] rawData) {
         if (rawData is null) {
             throw new ArgumentNullException(nameof(rawData));
         }
@@ -121,7 +118,7 @@ public sealed class RsaPssParameters : ISignatureParameters {
                         break;
                     case 0xa1:
                         var mgf = new AlgorithmIdentifier(asn.GetPayload());
-                        if (mgf.AlgorithmId.Value != MGF1_OID) {
+                        if (mgf.AlgorithmId.Value != AlgorithmOid.Mgf1) {
                             throw new NotSupportedException($"Mask generation function '{mgf.AlgorithmId.Value}' is not supported.");
                         }
                         if (mgf.Parameters is null) {
@@ -150,13 +147,9 @@ public sealed class RsaPssParameters : ISignatureParameters {
         return Asn1Builder.Create()
             .AddExplicit(0, x => x.AddSequence(y => y.AddObjectIdentifier(HashAlgorithm)))
             .AddExplicit(1, x => x.AddSequence(y => y
-                .AddObjectIdentifier(new Oid(MGF1_OID))
+                .AddObjectIdentifier(new Oid(AlgorithmOid.Mgf1))
                 .AddSequence(z => z.AddObjectIdentifier(MaskGenHashAlgorithm))))
             .AddExplicit(2, x => x.AddInteger(SaltLength))
             .GetEncoded();
-    }
-    /// <inheritdoc />
-    public AlgorithmIdentifier ToAlgorithmIdentifier() {
-        return new AlgorithmIdentifier(SignatureAlgorithm, Encode());
     }
 }
