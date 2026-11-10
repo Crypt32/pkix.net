@@ -28,9 +28,9 @@ public class CryptSignerTests {
         Assert.AreNotEqual(true, verify);
     }
     static void setPadding(CryptSigner signer, RSASignaturePadding padding) {
-        signer.SignatureParameters = padding == RSASignaturePadding.Pss
-            ? RsaPssParameters.CreateDefault(signer.HashingAlgorithm)
-            : null;
+        signer.SignatureScheme = padding == RSASignaturePadding.Pss
+            ? SignatureScheme.CreatePss(signer.HashingAlgorithm)
+            : null!;
     }
     void hashTestSeries(X509Certificate2 cert, RSASignaturePadding padding) {
         // SHA1

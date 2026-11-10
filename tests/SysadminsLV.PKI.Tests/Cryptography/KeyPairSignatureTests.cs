@@ -60,13 +60,16 @@ public class KeyPairSignatureTests {
         Assert.ThrowsExactly<InvalidOperationException>(() => pub.SignData(_data, _sha256));
     }
     [TestMethod]
-    public void EcdsaAcceptsSpecifiedParametersOnlyWithSameHash() {
+    public void EcdsaAcceptsSpecifiedSchemeAndRejectsRsaSchemes() {
         using ECDsa ecdsa = createEcdsa("nistP256");
         using var key = new ECDsaPrivateKey(ecdsa);
-        Byte[] raw = key.SignData(_data, _sha256, new SpecifiedEcdsaParameters(_sha256));
-        Assert.IsTrue(key.VerifyData(_data, raw, _sha256, new SpecifiedEcdsaParameters(_sha256)));
-        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, _sha256, new SpecifiedEcdsaParameters(_sha1)));
-        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, _sha256, RsaPssParameters.CreateDefault(_sha256)));
+        SignatureScheme specified = SignatureScheme.CreateSpecifiedEcdsa(_sha256);
+        Byte[] raw = key.SignData(_data, specified);
+        Assert.IsTrue(key.VerifyData(_data, raw, specified));
+        // classic and specified ECDSA produce interchangeable signatures
+        Assert.IsTrue(key.VerifyData(_data, raw, _sha256));
+        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, SignatureScheme.CreatePss(_sha256)));
+        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, SignatureScheme.CreateNoSign(_sha256)));
     }
 
     [TestMethod]
@@ -90,9 +93,9 @@ public class KeyPairSignatureTests {
     public void RsaPssUsesHashLengthSalt() {
         using RSA rsa = RSA.Create(2048);
         using var key = new RsaPrivateKey(rsa);
-        var pss = RsaPssParameters.CreateDefault(_sha256);
-        Byte[] sig = key.SignData(_data, _sha256, pss);
-        Assert.IsTrue(key.VerifyData(_data, sig, _sha256, pss));
+        SignatureScheme pss = SignatureScheme.CreatePss(_sha256);
+        Byte[] sig = key.SignData(_data, pss);
+        Assert.IsTrue(key.VerifyData(_data, sig, pss));
         Assert.IsTrue(rsa.VerifyData(_data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
         // PSS signature is not valid as PKCS#1 signature
         Assert.IsFalse(key.VerifyData(_data, sig, _sha256));
@@ -101,10 +104,11 @@ public class KeyPairSignatureTests {
     public void RsaPssRejectsNonDefaultSaltAndMismatchedHash() {
         using RSA rsa = RSA.Create(2048);
         using var key = new RsaPrivateKey(rsa);
-        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, _sha256, new RsaPssParameters(_sha256, 20)));
-        Assert.ThrowsExactly<NotSupportedException>(() => key.VerifyData(_data, new Byte[256], _sha256, new RsaPssParameters(_sha256, 0)));
-        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, _sha256, new RsaPssParameters(_sha1, 20)));
-        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, _sha256, new SpecifiedEcdsaParameters(_sha256)));
+        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, SignatureScheme.CreatePss(new RsaPssParameters(_sha256, 20))));
+        Assert.ThrowsExactly<NotSupportedException>(() => key.VerifyData(_data, new Byte[256], SignatureScheme.CreatePss(new RsaPssParameters(_sha256, 0))));
+        // salt length of SHA1 is 20, but SHA256 salt is required for SHA256 hash
+        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, SignatureScheme.CreatePss(new RsaPssParameters(_sha1, 32))));
+        Assert.ThrowsExactly<NotSupportedException>(() => key.SignData(_data, SignatureScheme.CreateSpecifiedEcdsa(_sha256)));
     }
 
     [TestMethod]
@@ -120,7 +124,7 @@ public class KeyPairSignatureTests {
         Byte[] encoded = priv.EncodeSignature(raw);
         Assert.IsTrue(dsa.VerifyData(_data, encoded, HashAlgorithmName.SHA1, DSASignatureFormat.Rfc3279DerSequence));
         CollectionAssert.AreEqual(raw, pub.DecodeSignature(encoded));
-        Assert.ThrowsExactly<NotSupportedException>(() => priv.SignData(_data, _sha1, RsaPssParameters.CreateDefault(_sha1)));
+        Assert.ThrowsExactly<NotSupportedException>(() => priv.SignData(_data, SignatureScheme.CreatePss(_sha1)));
     }
 
     [TestMethod]
@@ -157,18 +161,18 @@ public class KeyPairSignatureTests {
         using RSA rsa = RSA.Create(2048);
         using var key = new RsaPrivateKey(rsa);
         using var signer = new CryptSigner(key, _sha256) {
-            SignatureParameters = new RsaPssParameters(_sha256, 20)
+            SignatureScheme = SignatureScheme.CreatePss(new RsaPssParameters(_sha256, 20))
         };
         Assert.ThrowsExactly<NotSupportedException>(() => signer.SignData(_data));
     }
     [TestMethod]
-    public void CryptSignerSignatureParametersDriveAlgorithmIdentifier() {
+    public void CryptSignerSignatureSchemeDrivesAlgorithmIdentifier() {
         using RSA rsa = RSA.Create(2048);
         using var key = new RsaPrivateKey(rsa);
         using var signer = new CryptSigner(key, _sha256);
         Assert.AreEqual(AlgorithmOid.SHA256_RSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
 
-        signer.SignatureParameters = RsaPssParameters.CreateDefault(_sha384);
+        signer.SignatureScheme = SignatureScheme.CreatePss(_sha384);
         Assert.AreEqual(AlgorithmOid.SHA384, signer.HashingAlgorithm.Value);
         Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
         Byte[] sig = signer.SignData(_data);
@@ -176,22 +180,21 @@ public class KeyPairSignatureTests {
         Assert.IsTrue(signer.VerifyData(_data, sig));
         Assert.ThrowsExactly<InvalidOperationException>(() => signer.HashingAlgorithm = _sha256);
 
-        signer.SignatureParameters = null;
-        Assert.IsNull(signer.SignatureParameters);
+        signer.SignatureScheme = null!;
+        Assert.AreEqual(AlgorithmOid.SHA384_RSA, signer.SignatureScheme.AlgorithmId.Value);
         Assert.AreEqual(AlgorithmOid.SHA384_RSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
     }
     [TestMethod]
-    public void CryptSignerRejectsIncompatibleSignatureParameters() {
+    public void CryptSignerRejectsIncompatibleSignatureScheme() {
         using ECDsa ecdsa = createEcdsa("nistP256");
         using var key = new ECDsaPrivateKey(ecdsa);
         using var signer = new CryptSigner(key, _sha256);
-        Assert.ThrowsExactly<NotSupportedException>(() => signer.SignatureParameters = RsaPssParameters.CreateDefault(_sha256));
-        Assert.ThrowsExactly<ArgumentException>(() => signer.GetAlgorithmIdentifier(new SpecifiedEcdsaParameters(_sha1)));
-        Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, signer.GetAlgorithmIdentifier(new SpecifiedEcdsaParameters(_sha256)).AlgorithmId.Value);
-        // identifier overload doesn't change the signer
+        Assert.ThrowsExactly<NotSupportedException>(() => signer.SignatureScheme = SignatureScheme.CreatePss(_sha256));
         Assert.AreEqual(AlgorithmOid.SHA256_ECDSA, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
+        // ECDSA identifier has no parameters
+        Assert.IsNull(signer.GetAlgorithmIdentifier().Parameters);
 
-        signer.SignatureParameters = new SpecifiedEcdsaParameters(_sha256);
+        signer.SignatureScheme = SignatureScheme.CreateSpecifiedEcdsa(_sha256);
         Byte[] sig = signer.SignData(_data);
         Assert.IsTrue(signer.VerifyData(_data, sig));
         Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, signer.GetAlgorithmIdentifier().AlgorithmId.Value);

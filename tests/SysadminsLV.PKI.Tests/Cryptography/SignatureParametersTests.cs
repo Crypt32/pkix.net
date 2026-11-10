@@ -35,7 +35,7 @@ public class SignatureParametersTests {
     }
     [TestMethod]
     public void PssAlgorithmIdentifierCarriesRealSalt() {
-        var alg = new RsaPssParameters(new Oid(AlgorithmOid.SHA256), 32).ToAlgorithmIdentifier();
+        var alg = SignatureScheme.CreatePss(new RsaPssParameters(new Oid(AlgorithmOid.SHA256), 32)).ToAlgorithmIdentifier();
         Assert.AreEqual(AlgorithmOid.RSA_PSS, alg.AlgorithmId.Value);
         Assert.AreEqual(32, RsaPssParameters.Decode(alg.Parameters).SaltLength);
     }
@@ -75,7 +75,7 @@ public class SignatureParametersTests {
         var original = new SpecifiedEcdsaParameters(new Oid(hashOid));
         var decoded = SpecifiedEcdsaParameters.Decode(original.Encode());
         Assert.AreEqual(hashOid, decoded.HashAlgorithm.Value);
-        var alg = original.ToAlgorithmIdentifier();
+        var alg = SignatureScheme.CreateSpecifiedEcdsa(new Oid(hashOid)).ToAlgorithmIdentifier();
         Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, alg.AlgorithmId.Value);
         CollectionAssert.AreEqual(original.Encode(), alg.Parameters);
     }
