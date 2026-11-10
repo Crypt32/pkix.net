@@ -1,10 +1,8 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using SysadminsLV.Asn1Parser;
-using SysadminsLV.Asn1Parser.Universal;
 
 namespace SysadminsLV.PKI.Cryptography;
 
@@ -18,8 +16,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
     Boolean nullSigned;
     AsymmetricKeyPair? pubKeyPair, privKeyPair;
     Oid hashAlgorithm;
-    Oid? sigAlgorithm;
-    ISignatureParameters? sigParams;
+    SignatureScheme? sigScheme;
     RSASignaturePadding paddingScheme = RSASignaturePadding.Pkcs1;
     Int32 pssSaltByteCount;
     KeyType keyType;
@@ -95,8 +92,8 @@ public class CryptSigner : ICryptSigner, IDisposable {
         get => new(hashAlgorithm);
         set {
             Oid newHash = getHashAlgorithm(value);
-            if (sigParams is not null && newHash.Value != sigParams.HashAlgorithm.Value) {
-                throw new InvalidOperationException("Hash algorithm is defined by SignatureParameters. Assign new parameters instead.");
+            if (sigScheme is not null && newHash.Value != sigScheme.HashAlgorithm?.Value) {
+                throw new InvalidOperationException("Hash algorithm is defined by SignatureScheme. Assign a new scheme instead.");
             }
             hashAlgorithm = newHash;
         }
@@ -104,12 +101,12 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// <summary>
     /// Gets resulting signature algorithm identifier.
     /// </summary>
-    public Oid SignatureAlgorithm => new(sigAlgorithm!);
+    public Oid SignatureAlgorithm => SignatureScheme.AlgorithmId;
     /// <summary>
     /// Gets or sets signature padding scheme for RSA signature creation and validation.
     /// Default is <strong>PKCS1</strong>.
     /// </summary>
-    [Obsolete("Use SignatureParameters property with RsaPssParameters instead.")]
+    [Obsolete("Use SignatureScheme property with SignatureScheme.CreatePss instead.")]
     public RSASignaturePadding PaddingScheme {
         get => paddingScheme;
         set => paddingScheme = value ?? throw new ArgumentNullException(nameof(value));
@@ -123,32 +120,50 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// The cross-platform implementation supports only the salt length that is equal to the hash length. Any other
     /// value causes <see cref="NotSupportedException"/> during signing and signature verification.
     /// </remarks>
-    [Obsolete("Use SignatureParameters property with RsaPssParameters instead.")]
+    [Obsolete("Use SignatureScheme property with SignatureScheme.CreatePss instead.")]
     public Int32 PssSaltByteCount {
         get => pssSaltByteCount;
         set => pssSaltByteCount = value;
     }
     /// <summary>
-    /// Gets or sets signature parameters: RSASSA-PSS parameters for RSA keys or specified ECDSA parameters for
-    /// ECDSA keys. When set, parameters define the hash algorithm of the signer. <strong>Null</strong> resets the signer
-    /// to the default signature format: PKCS#1 v1.5 for RSA, plain ECDSA, DSA.
+    /// Gets or sets the signature scheme of the signer. When set, the scheme defines the hash algorithm of the signer.
+    /// Assigning <strong>null</strong> resets the signer to the default scheme of the key algorithm: PKCS#1 v1.5 for RSA,
+    /// plain ECDSA, DSA.
     /// </summary>
-    /// <exception cref="NotSupportedException">The parameters are not applicable to the signer's key algorithm.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// Parameters are set and the hash algorithm of the signer is changed to a different value.
+    /// <exception cref="NotSupportedException">
+    /// The scheme is not applicable to the signer's key algorithm or is not based on a hash algorithm.
     /// </exception>
-    public ISignatureParameters? SignatureParameters {
-        get => getSignatureParameters();
+    /// <exception cref="InvalidOperationException">
+    /// A scheme with explicit parameters is set and the hash algorithm of the signer is changed to a different value.
+    /// </exception>
+    public SignatureScheme SignatureScheme {
+        get => nullSigned ? SignatureScheme.CreateNoSign(hashAlgorithm) : getScheme();
         set {
             if (value is null) {
-                sigParams = null;
+                sigScheme = null;
+                nullSigned = false;
+                paddingScheme = RSASignaturePadding.Pkcs1;
+                return;
+            }
+            if (value.IsNoSign) {
+                sigScheme = null;
+                nullSigned = true;
+                hashAlgorithm = value.HashAlgorithm!;
+                return;
+            }
+            if (value.KeyAlgorithm?.Value != PublicKeyAlgorithm.Value) {
+                throw new NotSupportedException($"The scheme '{value.AlgorithmId.Format(true)}' is not applicable to the signer's key algorithm.");
+            }
+
+            nullSigned = false;
+            hashAlgorithm = value.HashAlgorithm ?? throw new NotSupportedException($"The scheme '{value.AlgorithmId.Format(true)}' is not based on a separate hash algorithm.");
+            // classic scheme is fully defined by the key algorithm and hash algorithm.
+            if (value.Parameters is ClassicSignatureSchemeParams) {
+                sigScheme = null;
                 paddingScheme = RSASignaturePadding.Pkcs1;
             } else {
-                validateParameters(value);
-                sigParams = value;
-                hashAlgorithm = new Oid(value.HashAlgorithm);
+                sigScheme = value;
             }
-            sigAlgorithm = null;
         }
     }
 
@@ -180,7 +195,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
         try {
             oid = Oid.FromOidValue(hashAlg.Value, OidGroup.HashAlgorithm);
         } catch {
-            oid = mapSignatureAlgorithmToHashAlgorithm(hashAlg.Value!, null);
+            oid = mapSignatureAlgorithmToHashAlgorithm(hashAlg.Value!);
         }
 
         switch (keyType) {
@@ -211,7 +226,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
 
         return oid;
     }
-    Oid mapSignatureAlgorithmToHashAlgorithm(String signatureOid, Asn1Reader? asn) {
+    Oid mapSignatureAlgorithmToHashAlgorithm(String signatureOid) {
         switch (signatureOid) {
             // md5
             case AlgorithmOid.MD5:
@@ -248,25 +263,12 @@ public class CryptSigner : ICryptSigner, IDisposable {
             case AlgorithmOid.SHA512_ECDSA:
             case AlgorithmOid.SHA512_RSA:
                 return new Oid(AlgorithmOid.SHA512);
-            case AlgorithmOid.ECDSA_SPECIFIED when asn is not null:
-                return SpecifiedEcdsaParameters.Decode(asn.GetTagRawData()).HashAlgorithm;
-            case AlgorithmOid.RSA_PSS when asn is not null:
-                return decodeRsaPss(asn);
             default:
                 throw new ArgumentException("Invalid signature algorithm");
         }
     }
-    Oid decodeRsaPss(Asn1Reader asn) {
-        var pssParams = RsaPssParameters.Decode(asn.GetTagRawData());
-        sigParams = pssParams;
-        return pssParams.HashAlgorithm;
-    }
     void getConfiguration(Byte[] algIdBlob) {
-        var asn = new Asn1Reader(algIdBlob);
-        asn.MoveNext();
-        Oid oid = new Asn1ObjectIdentifier(asn).Value;
-        asn.MoveNext();
-        hashAlgorithm = mapSignatureAlgorithmToHashAlgorithm(oid.Value!, asn);
+        SignatureScheme = SignatureScheme.Decode(algIdBlob);
     }
 
     /// <summary>
@@ -308,26 +310,16 @@ public class CryptSigner : ICryptSigner, IDisposable {
     AsymmetricKeyPair getVerificationKey() {
         return pubKeyPair ?? throw new InvalidOperationException("The signer doesn't have a public key.");
     }
-    // PSS is the only mode that carries additional signature parameters.
-    ISignatureParameters? getSignatureParameters() {
-        if (sigParams is not null) {
-            return sigParams;
+    // gets effective key-based scheme: explicit one, legacy PSS configuration or the default scheme of the key
+    SignatureScheme getScheme() {
+        if (sigScheme is not null) {
+            return sigScheme;
+        }
+        if (keyType == KeyType.Rsa && paddingScheme == RSASignaturePadding.Pss) {
+            return SignatureScheme.CreatePss(new RsaPssParameters(hashAlgorithm, pssSaltByteCount));
         }
 
-        return keyType == KeyType.Rsa && paddingScheme == RSASignaturePadding.Pss
-            ? new RsaPssParameters(hashAlgorithm, pssSaltByteCount)
-            : null;
-    }
-    // ensures that parameters are applicable to the key algorithm
-    void validateParameters(ISignatureParameters parameters) {
-        Boolean valid = parameters switch {
-            RsaPssParameters => keyType == KeyType.Rsa,
-            SpecifiedEcdsaParameters => keyType == KeyType.EcDsa,
-            _ => false
-        };
-        if (!valid) {
-            throw new NotSupportedException($"Signature parameters of type '{parameters.GetType().Name}' are not applicable to the key algorithm.");
-        }
+        return getVerificationKey().CreateSignatureScheme(hashAlgorithm);
     }
 
     // null-signed: the "signature" is a plain hash of data (see SignedContentBlob.Hash)
@@ -338,27 +330,6 @@ public class CryptSigner : ICryptSigner, IDisposable {
 
         // performs exact binary comparison
         return !hash.Where((t, index) => t != signature[index]).Any();
-    }
-
-    void getSignatureAlgorithm() {
-        switch (keyType) {
-            case KeyType.EcDsa:
-                sigAlgorithm = sigParams is SpecifiedEcdsaParameters
-                    ? new Oid(AlgorithmOid.ECDSA_SPECIFIED)                  // specifiedECDSA
-                    : new Oid($"{hashAlgorithm.FriendlyName}ECDSA");          // ECDSA
-                break;
-            case KeyType.Rsa:
-                sigAlgorithm = getSignatureParameters() is RsaPssParameters
-                    ? new Oid(AlgorithmOid.RSA_PSS)                        // RSASSA-PSS
-                    : new Oid($"{hashAlgorithm.FriendlyName}RSA");            // RSA
-                break;
-            case KeyType.Dsa:
-                // DSA doesn't support PSS padding and hashing algorithm other than SHA1
-                sigAlgorithm = new Oid(AlgorithmOid.SHA1_DSA);               // sha1DSA
-                break;
-            default:
-                throw new NotSupportedException("Public key algorithm is not supported.");
-        }
     }
 
     /// <summary>
@@ -375,8 +346,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
             throw new ArgumentNullException(nameof(message));
         }
 
-        Byte[] signature = getSigningKey().SignData(message, hashAlgorithm, getSignatureParameters());
-        getSignatureAlgorithm();
+        Byte[] signature = getSigningKey().SignData(message, getScheme());
         return signature;
     }
     /// <summary>
@@ -393,8 +363,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
             throw new ArgumentNullException(nameof(hash));
         }
 
-        Byte[] signature = getSigningKey().SignHash(hash, hashAlgorithm, getSignatureParameters());
-        getSignatureAlgorithm();
+        Byte[] signature = getSigningKey().SignHash(hash, getScheme());
         return signature;
     }
     /// <summary>
@@ -421,7 +390,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
             return verifyNullSigned(HashUtils.ComputeHash(hashAlgorithm, message), signature);
         }
 
-        return getVerificationKey().VerifyData(message, signature, hashAlgorithm, getSignatureParameters());
+        return getVerificationKey().VerifyData(message, signature, getScheme());
     }
     /// <summary>
     /// Verifies that the specified signature matches the specified hash.
@@ -448,7 +417,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
             return verifyNullSigned(hash, signature);
         }
 
-        return getVerificationKey().VerifyHash(hash, signature, hashAlgorithm, getSignatureParameters());
+        return getVerificationKey().VerifyHash(hash, signature, getScheme());
     }
     /// <summary>
     /// Verifies signature of a signed blob by using specified public key.
@@ -458,7 +427,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// <returns></returns>
     /// <remarks>
     /// This method is suitable to validate certificate signing requests (CSR) or other data
-    /// when signing key pair exist outside of X.509 certificate object.
+    /// when signing key pair exist outside X.509 certificate object.
     /// </remarks>
     public static Boolean VerifyData(SignedContentBlob blob, PublicKey publicKey) {
         if (blob is null) {
@@ -496,10 +465,10 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// ECDSA keys. Otherwise, the parameter is ignored. Default value is <strong>false</strong>.
     /// </param>
     /// <returns>ASN-encoded algorithm identifier.</returns>
-    [Obsolete("Use GetAlgorithmIdentifier() or GetAlgorithmIdentifier(ISignatureParameters) instead.")]
+    [Obsolete("Use GetAlgorithmIdentifier() or SignatureScheme property instead.")]
     public AlgorithmIdentifier GetAlgorithmIdentifier(Boolean alternate = false) {
         if (alternate && keyType == KeyType.EcDsa) {
-            return new SpecifiedEcdsaParameters(hashAlgorithm).ToAlgorithmIdentifier();
+            return SignatureScheme.CreateSpecifiedEcdsa(hashAlgorithm).ToAlgorithmIdentifier();
         }
 
         return GetAlgorithmIdentifier();
@@ -509,40 +478,7 @@ public class CryptSigner : ICryptSigner, IDisposable {
     /// </summary>
     /// <returns>ASN-encoded algorithm identifier.</returns>
     public AlgorithmIdentifier GetAlgorithmIdentifier() {
-        return getAlgorithmIdentifier(getSignatureParameters());
-    }
-    /// <summary>
-    /// Gets ASN-encoded algorithm identifier for the specified signature parameters. The signer configuration is not changed.
-    /// </summary>
-    /// <param name="parameters">
-    /// Signature parameters. <strong>Null</strong> produces the default identifier for the key algorithm:
-    /// PKCS#1 v1.5 for RSA, plain ECDSA, DSA.
-    /// </param>
-    /// <exception cref="NotSupportedException">The parameters are not applicable to the signer's key algorithm.</exception>
-    /// <exception cref="ArgumentException">Hash algorithm of the parameters doesn't match the signer's hash algorithm.</exception>
-    /// <returns>ASN-encoded algorithm identifier.</returns>
-    public AlgorithmIdentifier GetAlgorithmIdentifier(ISignatureParameters? parameters) {
-        if (parameters is not null) {
-            validateParameters(parameters);
-            if (parameters.HashAlgorithm.Value != hashAlgorithm.Value) {
-                throw new ArgumentException("Hash algorithm of the parameters doesn't match the hash algorithm of the signer.", nameof(parameters));
-            }
-        }
-
-        return getAlgorithmIdentifier(parameters);
-    }
-    AlgorithmIdentifier getAlgorithmIdentifier(ISignatureParameters? parameters) {
-        if (parameters is not null) {
-            return parameters.ToAlgorithmIdentifier();
-        }
-        if (sigAlgorithm is null) {
-            getSignatureAlgorithm();
-        }
-
-        // PKCS#1 v1.5 padding: NULL parameters. Other algorithms don't have parameters.
-        return keyType == KeyType.Rsa
-            ? new AlgorithmIdentifier(sigAlgorithm!, new Asn1Null().GetRawDataAsMemory().ToArray())
-            : new AlgorithmIdentifier(sigAlgorithm!, Array.Empty<Byte>());
+        return SignatureScheme.ToAlgorithmIdentifier();
     }
 
     #region IDisposable implementation

@@ -29,14 +29,14 @@ public interface ICryptSigner {
     /// Gets or sets signature padding scheme for RSA signature creation and validation.
     /// Default is <strong>PKCS1</strong>.
     /// </summary>
-    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureParameters instead.")]
+    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureScheme instead.")]
     RSASignaturePadding PaddingScheme { get; set; }
     /// <summary>
     /// Gets or sets the size, in bytes, of the random salt to use for the PSS padding.
     /// Default value matches the hash output length: 16 bytes for MD5, 20 bytes for SHA1, 32 bytes for
     /// SHA256, 48 bytes for SHA384 and 64 bytes for SHA512 hashing algorithm.
     /// </summary>
-    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureParameters instead.")]
+    [Obsolete("Signature parameters are defined by the signer implementation. Use CryptSigner.SignatureScheme instead.")]
     Int32 PssSaltByteCount { get; set; }
     /// <summary>
     /// Signs the data with signer's private key and specified hash algorithm.
