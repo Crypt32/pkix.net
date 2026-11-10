@@ -119,8 +119,8 @@ public sealed class RsaPublicKey : AsymmetricKeyPair {
     /// <inheritdoc />
     public override Int32 KeySize => getKey().KeySize;
     /// <inheritdoc />
-    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
-        return RsaSignatureHelper.VerifyHash(getKey(), hash, signature, hashAlgorithm, parameters);
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, SignatureScheme scheme) {
+        return RsaSignatureHelper.VerifyHash(getKey(), hash, signature, scheme);
     }
     /// <inheritdoc />
     public override Byte[] EncodeSignature(Byte[] rawSignature) {

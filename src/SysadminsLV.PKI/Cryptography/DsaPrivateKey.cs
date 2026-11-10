@@ -139,12 +139,12 @@ public sealed class DsaPrivateKey : AsymmetricKeyPair {
     /// <inheritdoc />
     public override Int32 KeySize => getKey().KeySize;
     /// <inheritdoc />
-    protected override Byte[] SignHashCore(Byte[] hash, Oid hashAlgorithm, ISignatureParameters? parameters) {
-        return DsaSignatureHelper.SignHash(getKey(), hash, parameters);
+    protected override Byte[] SignHashCore(Byte[] hash, SignatureScheme scheme) {
+        return DsaSignatureHelper.SignHash(getKey(), hash, scheme);
     }
     /// <inheritdoc />
-    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, Oid hashAlgorithm, ISignatureParameters? parameters) {
-        return DsaSignatureHelper.VerifyHash(getKey(), hash, signature, parameters);
+    protected override Boolean VerifyHashCore(Byte[] hash, Byte[] signature, SignatureScheme scheme) {
+        return DsaSignatureHelper.VerifyHash(getKey(), hash, signature, scheme);
     }
     /// <inheritdoc />
     public override Byte[] EncodeSignature(Byte[] rawSignature) {
