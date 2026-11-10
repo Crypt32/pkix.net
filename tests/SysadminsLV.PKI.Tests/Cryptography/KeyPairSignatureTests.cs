@@ -12,6 +12,7 @@ public class KeyPairSignatureTests {
     static readonly Oid _sha256 = new(AlgorithmOid.SHA256);
     static readonly Oid _sha1 = new(AlgorithmOid.SHA1);
     static readonly Oid _sha384 = new(AlgorithmOid.SHA384);
+    static readonly Oid _sha512 = new(AlgorithmOid.SHA512);
 
     static ECDsa createEcdsa(String curve) {
         return ECDsa.Create(ECCurve.CreateFromFriendlyName(curve));
@@ -178,7 +179,12 @@ public class KeyPairSignatureTests {
         Byte[] sig = signer.SignData(_data);
         Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.SignatureAlgorithm.Value);
         Assert.IsTrue(signer.VerifyData(_data, sig));
-        Assert.ThrowsExactly<InvalidOperationException>(() => signer.HashingAlgorithm = _sha256);
+        // changing the hash algorithm rebuilds the scheme and keeps its kind
+        signer.HashingAlgorithm = _sha256;
+        Assert.AreEqual(AlgorithmOid.SHA256, signer.SignatureScheme.HashAlgorithm!.Value);
+        Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.SignatureAlgorithm.Value);
+        Assert.IsTrue(signer.VerifyData(_data, signer.SignData(_data)));
+        signer.HashingAlgorithm = _sha384;
 
         signer.SignatureScheme = null!;
         Assert.AreEqual(AlgorithmOid.SHA384_RSA, signer.SignatureScheme.AlgorithmId.Value);
@@ -199,6 +205,63 @@ public class KeyPairSignatureTests {
         Assert.IsTrue(signer.VerifyData(_data, sig));
         Assert.AreEqual(AlgorithmOid.ECDSA_SPECIFIED, signer.GetAlgorithmIdentifier().AlgorithmId.Value);
     }
+    [TestMethod]
+    public void CryptSignerWithNoSignSchemeCannotSign() {
+        using RSA rsa = RSA.Create(2048);
+        using var key = new RsaPrivateKey(rsa);
+        using var signer = new CryptSigner(key, SignatureScheme.CreateNoSign(_sha256));
+        Assert.IsTrue(signer.SignatureScheme.IsNoSign);
+        Assert.AreEqual(AlgorithmOid.SHA256, signer.HashingAlgorithm.Value);
+        Assert.ThrowsExactly<NotSupportedException>(() => signer.SignData(_data));
+        // verification compares the plain hash
+        Byte[] hash = SHA256.Create().ComputeHash(_data);
+        Assert.IsTrue(signer.VerifyData(_data, hash));
+        Assert.IsFalse(signer.VerifyData(_data, new Byte[hash.Length]));
+        // the hash algorithm can be changed, the scheme remains NoSign
+        signer.HashingAlgorithm = _sha384;
+        Assert.IsTrue(signer.SignatureScheme.IsNoSign);
+        Assert.AreEqual(AlgorithmOid.SHA384, signer.HashingAlgorithm.Value);
+        // reset returns key-based scheme
+        signer.SignatureScheme = null!;
+        Assert.AreEqual(AlgorithmOid.SHA384_RSA, signer.SignatureAlgorithm.Value);
+        Assert.IsTrue(signer.VerifyData(_data, signer.SignData(_data)));
+    }
+    [TestMethod]
+    public void CryptSignerSchemeConstructorValidatesKeyAlgorithm() {
+        using RSA rsa = RSA.Create(2048);
+        using var key = new RsaPrivateKey(rsa);
+        using var signer = new CryptSigner(key, SignatureScheme.CreatePss(_sha256));
+        Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.SignatureAlgorithm.Value);
+        Assert.IsTrue(signer.VerifyData(_data, signer.SignData(_data)));
+        Assert.ThrowsExactly<NotSupportedException>(() => new CryptSigner(key, SignatureScheme.CreateSpecifiedEcdsa(_sha256)));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new CryptSigner(key, (SignatureScheme)null!));
+    }
+    [TestMethod]
+    public void CryptSignerAcceptsSignatureAlgorithmAsHashAlgorithm() {
+        using RSA rsa = RSA.Create(2048);
+        using var key = new RsaPrivateKey(rsa);
+        using var signer = new CryptSigner(key, new Oid(AlgorithmOid.SHA384_RSA));
+        Assert.AreEqual(AlgorithmOid.SHA384, signer.HashingAlgorithm.Value);
+        Assert.ThrowsExactly<ArgumentException>(() => new CryptSigner(key, new Oid("1.2.3.4.5")));
+    }
+    [TestMethod]
+    #pragma warning disable CS0618
+    public void CryptSignerLegacyPaddingAndSaltMapToScheme() {
+        using RSA rsa = RSA.Create(2048);
+        using var key = new RsaPrivateKey(rsa);
+        using var signer = new CryptSigner(key, _sha256);
+        Assert.AreEqual(32, signer.PssSaltByteCount);
+        signer.PaddingScheme = RSASignaturePadding.Pss;
+        Assert.AreEqual(AlgorithmOid.RSA_PSS, signer.SignatureAlgorithm.Value);
+        Assert.AreEqual(RSASignaturePadding.Pss, signer.PaddingScheme);
+        signer.HashingAlgorithm = _sha512;
+        Assert.AreEqual(64, signer.PssSaltByteCount);
+        signer.PssSaltByteCount = 64;
+        Assert.ThrowsExactly<NotSupportedException>(() => signer.PssSaltByteCount = 20);
+        signer.PaddingScheme = RSASignaturePadding.Pkcs1;
+        Assert.AreEqual(AlgorithmOid.SHA512_RSA, signer.SignatureAlgorithm.Value);
+    }
+    #pragma warning restore CS0618
     sealed class TrackingSigner(X509Certificate2 certificate, Oid hash) : CryptSigner(certificate, hash) {
         public Int32 AcquireCount { get; private set; }
         protected override AsymmetricKeyPair? AcquirePrivateKeyPair(X509Certificate2 certificate) {
