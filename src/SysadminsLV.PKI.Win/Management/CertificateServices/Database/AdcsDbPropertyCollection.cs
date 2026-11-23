@@ -1,4 +1,5 @@
-﻿using System;
+#nullable enable
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography;
@@ -10,14 +11,14 @@ namespace SysadminsLV.PKI.Management.CertificateServices.Database;
 /// <summary>
 /// Contains a collection of ADCS database entry properties.
 /// </summary>
-public class AdcsDbPropertyCollection : IDictionary<String, Object> {
-    readonly IDictionary<String, Object> _dictionary = new Dictionary<String, Object>(StringComparer.InvariantCultureIgnoreCase);
+public class AdcsDbPropertyCollection : IDictionary<String, Object?> {
+    readonly IDictionary<String, Object?> _dictionary = new Dictionary<String, Object?>(StringComparer.InvariantCultureIgnoreCase);
     
     /// <summary>
     /// Returns an enumerator that iterates through the collection.
     /// </summary>
     /// <returns>An enumerator that can be used to iterate through the collection.</returns>
-    public IEnumerator<KeyValuePair<String, Object>> GetEnumerator() {
+    public IEnumerator<KeyValuePair<String, Object?>> GetEnumerator() {
         return _dictionary.GetEnumerator();
     }
     /// <inheritdoc />
@@ -28,7 +29,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// Adds an item to the dictionary.
     /// </summary>
     /// <param name="item">The object to add to the dictionary.</param>
-    public void Add(KeyValuePair<String, Object> item) {
+    public void Add(KeyValuePair<String, Object?> item) {
         _dictionary.Add(item);
     }
     /// <summary>
@@ -42,7 +43,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// </summary>
     /// <param name="item">The object to locate in the dictionary.</param>
     /// <returns><strong>True</strong> if item is found in the dictionary; otherwise, <strong>False</strong>.</returns>
-    public Boolean Contains(KeyValuePair<String, Object> item) {
+    public Boolean Contains(KeyValuePair<String, Object?> item) {
         return _dictionary.Contains(item);
     }
     /// <summary>
@@ -54,7 +55,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// The <see cref="Array"/> must have zero-based indexing.
     /// </param>
     /// <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
-    public void CopyTo(KeyValuePair<String, Object>[] array, Int32 arrayIndex) {
+    public void CopyTo(KeyValuePair<String, Object?>[] array, Int32 arrayIndex) {
         _dictionary.CopyTo(array, arrayIndex);
     }
     /// <summary>
@@ -66,7 +67,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// <strong>False</strong>. This method also returns false if item is not found in the original
     /// dictionary.
     /// </returns>
-    public Boolean Remove(KeyValuePair<String, Object> item) {
+    public Boolean Remove(KeyValuePair<String, Object?> item) {
         return _dictionary.Remove(item);
     }
     /// <summary>
@@ -94,7 +95,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// </summary>
     /// <param name="key">The key of the element to add.</param>
     /// <param name="value">The value of the element to add. The value can be null for reference types.</param>
-    public void Add(String key, Object value) {
+    public void Add(String key, Object? value) {
         _dictionary.Add(key, value);
     }
     /// <summary>
@@ -121,7 +122,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// <strong>True</strong> if the dictionary contains an element with the specified key;
     /// otherwise, <strong>False</strong>.
     /// </returns>
-    public Boolean TryGetValue(String key, out Object value) {
+    public Boolean TryGetValue(String key, out Object? value) {
         return _dictionary.TryGetValue(key, out value);
     }
     /// <summary>
@@ -131,7 +132,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// <returns>The value associated with the specified key. If the specified key is not found, a get
     /// operation throws a <see cref="KeyNotFoundException"/>, and a set operation creates a new element
     /// with the specified key.</returns>
-    public Object this[String key] {
+    public Object? this[String key] {
         get => _dictionary[key];
         set => _dictionary[key] = value;
     }
@@ -142,7 +143,7 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
     /// <summary>
     /// Gets a collection containing the values in the dictionary.
     /// </summary>
-    public ICollection<Object> Values => _dictionary.Values;
+    public ICollection<Object?> Values => _dictionary.Values;
 
     /// <summary>
     /// Performs collection post-processing operations by adding additional properties that contain decoded values for certain
@@ -161,21 +162,23 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
         setPropertyFlags<AdcsDbExtensionFlags>(AdcsDbColumnName.Extension_Flags);
         setPropertyFlags<AdcsDbCrlPublishFlags>(AdcsDbColumnName.CRL_Publish_Flags);
 
-        if (_dictionary.TryGetValue(AdcsDbColumnName.Certificate_Template, out Object templateName) && !String.IsNullOrWhiteSpace((String)templateName)) {
-            _dictionary[AdcsDbColumnName.Certificate_Template + "Oid"] = new Oid((String)templateName);
+        if (_dictionary.TryGetValue(AdcsDbColumnName.Certificate_Template, out Object? templateName) && !String.IsNullOrWhiteSpace(templateName as String)) {
+            _dictionary[AdcsDbColumnName.Certificate_Template + "Oid"] = new Oid((String)templateName!);
         }
-        if (_dictionary.TryGetValue(AdcsDbColumnName.Extension_Name, out Object name)) {
+        if (_dictionary.TryGetValue(AdcsDbColumnName.Extension_Name, out Object? name) && !String.IsNullOrWhiteSpace(name as String)) {
             // add extension name as OID.
-            _dictionary[AdcsDbColumnName.Extension_Name + "Oid"] = new Oid((String)name);
-            if (_dictionary.TryGetValue(AdcsDbColumnName.Extension_Flags, out Object rawFlags) && _dictionary.TryGetValue(AdcsDbColumnName.Extension_Raw_Value, out Object value)) {
+            _dictionary[AdcsDbColumnName.Extension_Name + "Oid"] = new Oid((String)name!);
+            if (_dictionary.TryGetValue(AdcsDbColumnName.Extension_Flags, out Object? rawFlags)
+                && _dictionary.TryGetValue(AdcsDbColumnName.Extension_Raw_Value, out Object? value)) {
+                String strExtRawValue = value as String ?? String.Empty;
                 // add X509Extension object to the row.
-                AdcsDbExtensionFlags flags = (AdcsDbExtensionFlags)rawFlags;
+                AdcsDbExtensionFlags flags = (AdcsDbExtensionFlags)(rawFlags ?? 0);
                 Boolean critical = (flags & AdcsDbExtensionFlags.Critical) != 0;
                 // extension value can be null, so need to handle this
-                Byte[] extensionRawData = String.IsNullOrWhiteSpace(value as String)
+                Byte[] extensionRawData = String.IsNullOrWhiteSpace(strExtRawValue)
                     ? []
-                    : Convert.FromBase64String((String)value);
-                var baseExtension = new X509Extension((String)name, extensionRawData, critical);
+                    : Convert.FromBase64String(strExtRawValue);
+                var baseExtension = new X509Extension((String)name!, extensionRawData, critical);
                 try {
                     _dictionary["ExtensionObject"] = baseExtension.ConvertExtension();
                 } catch {
@@ -187,8 +190,8 @@ public class AdcsDbPropertyCollection : IDictionary<String, Object> {
 
     void setPropertyFlags<TEnum>(String columnName) where TEnum : Enum {
         const String propSuffix = "Enum";
-        if (_dictionary.TryGetValue(columnName, out Object columnValue)) {
-            _dictionary.Add(columnName + propSuffix, (TEnum)columnValue);
+        if (_dictionary.TryGetValue(columnName, out Object? columnValue)) {
+            _dictionary.Add(columnName + propSuffix, (TEnum)(columnValue ?? 0));
         }
     }
 }
